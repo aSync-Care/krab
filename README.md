@@ -25,7 +25,8 @@ Krab wordt gratis gedeeld en geleverd zoals het is, zonder garantie, onderhoud o
 
 ## Wat het doet
 
-- **Opties:** tot 10 reeksen met een eigen naam, elk van 1 tot 10 sneltoetsen met instelbare wachttijden. Gebruikers kiezen een optie; beheer stelt ze in met de pincode. De reeks start met één vaste toets (aanbevolen, bijvoorbeeld F9) of met elke toets.
+- **Opties:** tot 10 reeksen met een eigen naam, elk van 1 tot 10 sneltoetsen met instelbare wachttijden. Gebruikers kiezen een optie; beheer stelt ze in met de pincode.
+- **Toetscombinaties opnemen of kiezen** in plaats van typen, en een optie **testen** in een eigen testvenster voordat je opslaat. De reeks start met één vaste toets (aanbevolen, bijvoorbeeld F9) of met elke toets.
 - **Esc stopt altijd**, ook midden in een reeks.
 - **Centrale instellingen** in één bestand voor alle gebruikers. Iedereen kan ze bekijken, wijzigen kan alleen met een beheerpincode. Een herstelcode helpt bij een vergeten pincode.
 - **Verzegeld bestand.** Is het instellingenbestand buiten het programma om gewijzigd, dan kan niemand starten tot de reservekopie is teruggezet.

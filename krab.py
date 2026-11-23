@@ -24,6 +24,7 @@ Opzet
 
 import copy
 import csv
+import ctypes
 import datetime as dt
 import hashlib
 import hmac
@@ -74,6 +75,51 @@ BEWAAR_MIN, BEWAAR_MAX = 7, 3650
 AFKOELTIJD = 0.4  # eigen geïnjecteerde toetsen starten geen nieuwe reeks
 ALIASSEN = {"control": "ctrl", "windows": "win", "escape": "esc", "return": "enter",
             "page up": "pageup", "page down": "pagedown"}
+
+# Windows-toetscodes (virtual-key codes) naar toetsnamen van pydirectinput.
+# Opnemen gebeurt op toetscode, zodat toetsenbordindeling en AltGr geen rol spelen.
+VK_NAMEN = {0x08: "backspace", 0x09: "tab", 0x0D: "enter", 0x10: "shift", 0x11: "ctrl", 0x12: "alt",
+            0x13: "pause", 0x14: "capslock", 0x1B: "esc", 0x20: "space", 0x21: "pageup", 0x22: "pagedown",
+            0x23: "end", 0x24: "home", 0x25: "left", 0x26: "up", 0x27: "right", 0x28: "down",
+            0x2C: "printscreen", 0x2D: "insert", 0x2E: "delete", 0x5B: "win", 0x5C: "win", 0x5D: "apps",
+            0x6A: "multiply", 0x6B: "add", 0x6D: "subtract", 0x6E: "decimal", 0x6F: "divide",
+            0x90: "numlock", 0x91: "scrolllock", 0xA0: "shift", 0xA1: "shift", 0xA2: "ctrl", 0xA3: "ctrl",
+            0xA4: "alt", 0xA5: "alt", 0xBA: ";", 0xBB: "=", 0xBC: ",", 0xBD: "-", 0xBE: ".", 0xBF: "/",
+            0xC0: "`", 0xDB: "[", 0xDC: "\\", 0xDD: "]", 0xDE: "'"}
+VK_NAMEN.update({0x30 + i: str(i) for i in range(10)})
+VK_NAMEN.update({0x60 + i: f"num{i}" for i in range(10)})
+VK_NAMEN.update({0x41 + i: chr(ord("a") + i) for i in range(26)})
+VK_NAMEN.update({0x70 + i: f"f{i + 1}" for i in range(24)})
+
+# Toetsen in de keuzelijst van 'Kiezen…' (alleen wat pydirectinput kan versturen, zie _kies_toets)
+KIES_TOETSEN = ([chr(ord("a") + i) for i in range(26)] + [str(i) for i in range(10)]
+                + [f"f{i}" for i in range(1, 13)]
+                + ["enter", "tab", "space", "backspace", "delete", "insert", "home", "end", "pageup", "pagedown",
+                   "left", "right", "up", "down", "add", "subtract", "multiply", "divide", "decimal",
+                   ";", "=", ",", "-", ".", "/", "`", "[", "\\", "]", "'"])
+TOETS_WEERGAVE = {"ctrl": "Ctrl", "alt": "Alt", "shift": "Shift", "win": "Win", "enter": "Enter", "tab": "Tab",
+                  "space": "Spatie", "backspace": "Backspace", "delete": "Delete", "insert": "Insert",
+                  "home": "Home", "end": "End", "pageup": "PgUp", "pagedown": "PgDn", "left": "←",
+                  "right": "→", "up": "↑", "down": "↓", "esc": "Esc", "add": "Num +", "subtract": "Num −",
+                  "multiply": "Num ×", "divide": "Num ÷", "decimal": "Num ,", "apps": "Menu",
+                  "capslock": "CapsLock", "numlock": "NumLock", "scrolllock": "ScrollLock",
+                  "printscreen": "PrtScn", "pause": "Pause"}
+
+
+def vk_naar_toets(keycode):
+    return VK_NAMEN.get(keycode)
+
+
+def toets_weergave(toets):
+    if toets in TOETS_WEERGAVE:
+        return TOETS_WEERGAVE[toets]
+    if toets.startswith("num") and toets[3:].isdigit():
+        return f"Num {toets[3:]}"
+    return toets.upper()
+
+
+def combi_weergave(combinatie):
+    return " + ".join(toets_weergave(d) for d in combinatie.split("+") if d)
 
 PIN_LENGTE = 6
 MAX_POGINGEN = 5
@@ -850,6 +896,151 @@ def maak_banner(parent, soort, titel=None, tekst=None, knoppen=(), link=None, br
     return b
 
 
+# ================================================================ toetsveld
+
+class ToetsVeld(tk.Frame):
+    """Toont een toetscombinatie als losse toetsen. Klik erop (of Enter) en druk de combinatie in.
+
+    De toetsen worden in het venster van Krab zelf opgevangen, niet met de
+    globale hook. Een sneltoets gaat tijdens het opnemen dus nergens anders heen.
+    """
+
+    RANDKLEUR = {"normaal": LIJN, "fout": ROOD, "gewijzigd": BLAUW}
+
+    def __init__(self, parent, app, waarde="", enkel=False, breedte=200):
+        super().__init__(parent, bg=WIT, width=breedte, height=30, highlightthickness=1, takefocus=1,
+                         cursor="hand2")
+        self.pack_propagate(False)
+        self.grid_propagate(False)
+        self.app = app
+        self.enkel = enkel  # True = één losse toets (de starttoets)
+        self.waarde = waarde or ""
+        self.stijl = "normaal"
+        self.ingeschakeld = True
+        self.opname = False
+        self._volgorde = []
+        self._ingedrukt = set()
+        self.binnen = tk.Frame(self, bg=WIT)
+        self.binnen.pack(side="left", padx=4, pady=3)
+        for w in (self, self.binnen):
+            w.bind("<Button-1>", self._klik)
+        self.bind("<KeyPress>", self._toets_neer)
+        self.bind("<KeyRelease>", self._toets_op)
+        self.bind("<FocusOut>", lambda _e: self.stop_opname())
+        self._teken()
+
+    # -- waarde en weergave
+    def get(self):
+        return self.waarde
+
+    def set(self, waarde):
+        self.waarde = waarde or ""
+        self._teken()
+
+    def zet_stijl(self, stijl):
+        self.stijl = stijl
+        self._teken()
+
+    def zet_ingeschakeld(self, aan):
+        self.ingeschakeld = aan
+        self.configure(cursor="hand2" if aan else "arrow", takefocus=1 if aan else 0)
+        if not aan:
+            self.stop_opname()
+        self._teken()
+
+    def alt_ingedrukt(self):
+        return self.opname and "alt" in self._ingedrukt
+
+    def _teken(self):
+        for w in self.binnen.winfo_children():
+            w.destroy()
+        achtergrond = WIT if self.ingeschakeld else VLAK
+        rand = BLAUW if self.opname else (self.RANDKLEUR.get(self.stijl, LIJN) if self.ingeschakeld else LIJN)
+        self.configure(bg=achtergrond, highlightbackground=rand, highlightcolor=rand)
+        self.binnen.configure(bg=achtergrond)
+        if self.opname and not self._volgorde:
+            tk.Label(self.binnen, text="Druk de toets in…" if self.enkel else "Druk de combinatie in…",
+                     bg=achtergrond, fg=BLAUW, font=("Segoe UI", 9, "italic")).pack(side="left")
+        elif self.opname or self.waarde:
+            delen = self._volgorde if self.opname else self.waarde.split("+")
+            for k, deel in enumerate(delen):
+                if k:
+                    tk.Label(self.binnen, text="+", bg=achtergrond, fg=GRIJS, font=("Segoe UI", 8)).pack(side="left")
+                tk.Label(self.binnen, text=toets_weergave(deel), bg=VLAK if self.ingeschakeld else WIT,
+                         fg=TEKST if self.ingeschakeld else GRIJS, font=("Segoe UI Semibold", 9),
+                         padx=5, bd=1, relief="solid").pack(side="left", padx=1)
+        else:
+            tk.Label(self.binnen, text="Klik en druk de toets in" if self.enkel else "Klik en druk de combinatie in",
+                     bg=achtergrond, fg=GRIJS, font=("Segoe UI", 9)).pack(side="left")
+        for w in self.binnen.winfo_children():
+            w.bind("<Button-1>", self._klik)
+
+    # -- opnemen
+    def _klik(self, _e=None):
+        if not self.ingeschakeld or self.opname or not self.app._opname_start(self):
+            return "break"
+        self.opname = True
+        self._volgorde, self._ingedrukt = [], set()
+        self.focus_set()
+        self._teken()
+        return "break"
+
+    def stop_opname(self):
+        if self.opname:
+            self.opname = False
+            self._volgorde, self._ingedrukt = [], set()
+            self.app._opname_stop(self)
+            self._teken()
+
+    def _klaar(self, delen):
+        self.waarde = "+".join(delen)
+        self.stop_opname()
+        self.app._markeer_wijzigingen()
+
+    def _toets_neer(self, event):
+        if not self.opname:
+            if event.keysym in ("Return", "space"):
+                return self._klik()
+            return None
+        naam = vk_naar_toets(event.keycode)
+        if naam is None:
+            return "break"
+        if naam == "esc":
+            self.stop_opname()
+            return "break"
+        if naam not in pyd.KEYBOARD_MAPPING:
+            self.app._opname_melding(f"{toets_weergave(naam)} kan Krab niet versturen. Kies een andere toets.")
+            return "break"
+        if self.enkel:
+            if naam in MODIFIERS:
+                self.app._opname_melding("Kies één gewone toets, zoals F9, zonder Ctrl, Alt of Shift.")
+            elif naam in GERESERVEERD:
+                self.app._opname_melding(GERESERVEERD[naam])
+            else:
+                self._klaar([naam])
+            return "break"
+        self._ingedrukt.add(naam)
+        if naam not in self._volgorde:
+            self._volgorde.append(naam)
+            self._teken()
+        return "break"
+
+    def _toets_op(self, event):
+        if not self.opname:
+            return None
+        self._ingedrukt.discard(vk_naar_toets(event.keycode))
+        if self._ingedrukt or not self._volgorde:
+            return "break"
+        gewoon = [d for d in self._volgorde if d not in MODIFIERS]
+        if not gewoon:
+            self.app._opname_melding("Druk naast Ctrl, Alt, Shift of Win ook een gewone toets in.")
+            self._volgorde = []
+            self._teken()
+            return "break"
+        self._klaar([m for m in ("ctrl", "alt", "shift", "win") if m in self._volgorde] + gewoon)
+        return "break"
+
+
 # ================================================================ app
 
 class App:
@@ -888,6 +1079,8 @@ class App:
         self._opgeschoond_op = None
         self._help_onderwerp = "waarschuwing"
         self._akkoord_gelogd = False
+        self._opname_veld = None
+        self._test = None
 
         self.root = tk.Tk()
         self.root.title(f"{APP_NAAM} v{VERSIE}")
@@ -997,6 +1190,8 @@ class App:
             self._tijdelijk = scherm
         scherm.pack(fill="both", expand=True)
         self._help_onderwerp = onderwerp
+        if self._test is not None and onderwerp not in ("wijzigen", "inrichten"):
+            self._test_sluiten()
 
     def _scherm(self, titel, stap=None):
         """Nieuw tijdelijk scherm met titel en Help-knop."""
@@ -1372,8 +1567,8 @@ class App:
                     self._cycli += 1
                     self.teller_label.configure(text=f"Reeksen: {self._cycli}")
                     self._zet_status("Actief – wacht op toets", GROEN)
-                elif soort == "opname":
-                    self._opname_klaar(*data)
+                elif soort == "test":
+                    self._test_bericht(*data)
         except queue.Empty:
             pass
         self._periodiek()
@@ -1610,10 +1805,10 @@ class App:
                         command=self._trigger_modus_gewijzigd).pack(side="left", padx=(0, 16))
         ttk.Radiobutton(rij, text="Alleen deze toets:", variable=v["trigger_modus"], value="vast",
                         command=self._trigger_modus_gewijzigd).pack(side="left")
-        v["trigger"] = ttk.Entry(rij, width=8)
-        v["trigger"].insert(0, c["trigger"])
+        v["trigger"] = ToetsVeld(rij, self, c["trigger"], enkel=True, breedte=150)
         v["trigger"].pack(side="left", padx=(6, 4))
-        v["trigger_opname"] = ttk.Button(rij, text="Opnemen", command=lambda: self._neem_op("trigger"))
+        v["trigger_opname"] = ttk.Button(rij, text="Kiezen…", style="Klein.TButton",
+                                         command=lambda: self._kies_toets(v["trigger"]))
         v["trigger_opname"].pack(side="left")
         v["trigger_fout"] = ttk.Label(tab_opties, style="Fout.TLabel", wraplength=560, justify="left")
         v["trigger_fout"].pack(anchor="w")
@@ -1662,14 +1857,19 @@ class App:
         v["naam_fout"].pack(anchor="w")
         v["stappen_vak"] = ttk.Frame(rechts)
         v["stappen_vak"].pack(fill="x", pady=(6, 0))
-        v["stap_toevoegen"] = ttk.Button(rechts, text="+ Stap toevoegen", style="Klein.TButton",
+        onder = ttk.Frame(rechts)
+        onder.pack(fill="x", pady=(6, 0))
+        v["stap_toevoegen"] = ttk.Button(onder, text="+ Stap toevoegen", style="Klein.TButton",
                                          command=self._stap_toevoegen)
-        v["stap_toevoegen"].pack(anchor="w", pady=(6, 0))
+        v["stap_toevoegen"].pack(side="left")
+        ttk.Button(onder, text="Optie testen…", style="Klein.TButton",
+                   command=self._optie_testen).pack(side="right")
         v["optie_fout"] = ttk.Label(rechts, style="Fout.TLabel", wraplength=380, justify="left")
         v["optie_fout"].pack(anchor="w")
 
-        ttk.Label(tab_opties, text=f"Maximaal {MAX_OPTIES} opties met elk 1 tot {MAX_STAPPEN} stappen. Schrijf "
-                                   "combinaties als ctrl+alt+1. Esc kan niet, die is voor stoppen.",
+        ttk.Label(tab_opties, text="Klik op een toetscombinatie en druk de toetsen in, of klik op Kiezen. Esc kan "
+                                   f"niet, die is voor stoppen. Maximaal {MAX_OPTIES} opties met elk 1 tot "
+                                   f"{MAX_STAPPEN} stappen.",
                   style="Klein.TLabel", wraplength=560, justify="left").pack(anchor="w", pady=(8, 0))
         v["opname_label"] = ttk.Label(tab_opties, style="Kop.TLabel", foreground=BLAUW)
         v["opname_label"].pack(anchor="w", pady=(4, 0))
@@ -1766,11 +1966,10 @@ class App:
         for j, stap in enumerate(optie["stappen"]):
             r = 1 + j * 2
             ttk.Label(vak, text=f"{j + 1}").grid(row=r, column=0, sticky="w", padx=(0, 8), pady=(3, 0))
-            toetsen = ttk.Entry(vak, width=16, font=("Consolas", 10))
-            toetsen.insert(0, stap["toetsen"])
+            toetsen = ToetsVeld(vak, self, stap["toetsen"])
             toetsen.grid(row=r, column=1, sticky="w", pady=(3, 0))
-            opname = ttk.Button(vak, text="Opnemen", style="Klein.TButton",
-                                command=lambda veld=toetsen: self._neem_op(veld))
+            opname = ttk.Button(vak, text="Kiezen…", style="Klein.TButton",
+                                command=lambda veld=toetsen: self._kies_toets(veld))
             opname.grid(row=r, column=2, padx=6, pady=(3, 0))
             wacht = ttk.Entry(vak, width=5, justify="right")
             wacht.insert(0, stap["wacht"])
@@ -1781,11 +1980,10 @@ class App:
             fout = ttk.Label(vak, style="Fout.TLabel", wraplength=380, justify="left")
             fout.grid(row=r + 1, column=0, columnspan=5, sticky="w")
             ft, fw = fouten.get(f"{i}.{j}.toetsen"), fouten.get(f"{i}.{j}.wacht")
-            toetsen.configure(style="Fout.TEntry" if ft else "TEntry")
-            wacht.configure(style="Fout.TEntry" if fw else "TEntry")
+            self._zet_stijl(toetsen, "fout" if ft else "normaal")
+            self._zet_stijl(wacht, "fout" if fw else "normaal")
             fout.configure(text="  ".join(m for m in (ft, fw) if m))
-            for veld in (toetsen, wacht):
-                veld.bind("<KeyRelease>", lambda _e: self._markeer_wijzigingen(), add="+")
+            wacht.bind("<KeyRelease>", lambda _e: self._markeer_wijzigingen(), add="+")
             v["stap_rijen"].append((toetsen, opname, wacht, weg, fout))
         v["stap_toevoegen"].configure(state="normal" if len(optie["stappen"]) < MAX_STAPPEN else "disabled")
         v["optie_fout"].configure(text=fouten.get(f"{i}.stappen", ""))
@@ -1886,7 +2084,7 @@ class App:
         if not v:
             return
         staat = "normal" if v["trigger_modus"].get() == "vast" else "disabled"
-        v["trigger"].configure(state=staat)
+        v["trigger"].zet_ingeschakeld(staat == "normal")
         v["trigger_opname"].configure(state=staat)
         self._markeer_wijzigingen()
 
@@ -1910,8 +2108,8 @@ class App:
         oud = concept_uit(b["basis"])
 
         def stijl(veld, gelijk):
-            if veld.cget("style") != "Fout.TEntry":
-                veld.configure(style="TEntry" if gelijk else "Gewijzigd.TEntry")
+            if self._stijl_van(veld) != "fout":
+                self._zet_stijl(veld, "normaal" if gelijk else "gewijzigd")
 
         trig_oud = oud["trigger"] if oud["trigger_modus"] == "vast" else ""
         trig_nieuw = v["trigger"].get().strip().lower() if v["trigger_modus"].get() == "vast" else ""
@@ -1930,7 +2128,7 @@ class App:
         b["fouten"] = fouten
         met_fout = sorted({int(k.split(".")[0]) for k in fouten if k[:1].isdigit()})
         v["trigger_fout"].configure(text=fouten.get("trigger", ""))
-        v["trigger"].configure(style="Fout.TEntry" if "trigger" in fouten else "TEntry")
+        self._zet_stijl(v["trigger"], "fout" if "trigger" in fouten else "normaal")
         v["bewaardagen_fout"].configure(text=fouten.get("bewaardagen", ""))
         v["bewaardagen"].configure(style="Fout.TEntry" if "bewaardagen" in fouten else "TEntry")
         algemeen = fouten.get("opties", "")
@@ -1952,9 +2150,7 @@ class App:
                             opties=standaard["opties"])
         b["keuze"] = 0
         v["trigger_modus"].set(standaard["trigger_modus"])
-        v["trigger"].configure(state="normal")
-        v["trigger"].delete(0, "end")
-        v["trigger"].insert(0, standaard["trigger"])
+        v["trigger"].set(standaard["trigger"])
         self._trigger_modus_gewijzigd()
         self._structuur_gewijzigd()
 
@@ -2285,49 +2481,283 @@ class App:
 
     # ------------------------------------------------------------ opnemen van toetsen
 
-    def _neem_op(self, doel):
-        """doel: 'trigger', of het invoerveld van een stap."""
-        v = self._velden
-        if self._opname_bezig or self._actief.is_set() or not v:
-            return
-        is_trigger = isinstance(doel, str)
+    @staticmethod
+    def _stijl_van(veld):
+        if isinstance(veld, ToetsVeld):
+            return veld.stijl
+        return {"Fout.TEntry": "fout", "Gewijzigd.TEntry": "gewijzigd"}.get(str(veld.cget("style")), "normaal")
+
+    @staticmethod
+    def _zet_stijl(veld, soort):
+        if isinstance(veld, ToetsVeld):
+            veld.zet_stijl(soort)
+        else:
+            veld.configure(style={"normaal": "TEntry", "fout": "Fout.TEntry", "gewijzigd": "Gewijzigd.TEntry"}[soort])
+
+    def _opname_start(self, veld):
+        if self._opname_bezig or self._actief.is_set():
+            return False
         self._opname_bezig = True
-        v["opname_label"].configure(
-            text="Druk nu de toets in…  (Esc = annuleren)" if is_trigger
-            else "Druk nu de combinatie in en laat los…  (Esc = annuleren)")
+        self._opname_veld = veld
+        lbl = self._velden.get("opname_label") if self._velden else None
+        if lbl is not None and lbl.winfo_exists():
+            lbl.configure(foreground=BLAUW, text="Druk de toets in. Esc = annuleren." if veld.enkel
+                          else "Druk de combinatie in en laat alle toetsen los. Esc = annuleren.")
+        return True
 
-        def opnemen():
-            try:
-                if is_trigger:
-                    while True:
-                        ev = keyboard.read_event(suppress=False)
-                        if ev.event_type == keyboard.KEY_DOWN:
-                            resultaat = ev.name or ""
-                            break
-                else:
-                    resultaat = keyboard.read_hotkey(suppress=False)
-            except Exception:  # noqa: BLE001 - opname mag de app nooit stoppen
-                resultaat = ""
-            self._ui.put(("opname", (doel, resultaat)))
-
-        threading.Thread(target=opnemen, daemon=True).start()
-
-    def _opname_klaar(self, doel, resultaat):
+    def _opname_stop(self, _veld):
         self._opname_bezig = False
-        v = self._velden
-        if not v or not v["opname_label"].winfo_exists():
+        self._opname_veld = None
+        lbl = self._velden.get("opname_label") if self._velden else None
+        if lbl is not None and lbl.winfo_exists():
+            lbl.configure(text="")
+
+    def _opname_melding(self, tekst):
+        lbl = self._velden.get("opname_label") if self._velden else None
+        if lbl is not None and lbl.winfo_exists():
+            lbl.configure(foreground=ROOD, text=tekst)
+
+    def _kies_toets(self, veld):
+        """Venster met vinkjes en een keuzelijst: een ongeldige combinatie is zo niet te maken."""
+        if self._opname_bezig or not veld.ingeschakeld:
             return
-        v["opname_label"].configure(text="")
-        delen = [normaliseer_toets(d) for d in resultaat.split("+") if d.strip()]
-        if not delen or "esc" in delen:
+        enkel = veld.enkel
+        top = tk.Toplevel(self.root)
+        self._kies_venster = top
+        top.title("Starttoets kiezen" if enkel else "Toetscombinatie kiezen")
+        top.transient(self.root)
+        top.attributes("-topmost", True)
+        top.resizable(False, False)
+        top.configure(bg=WIT)
+        f = ttk.Frame(top, padding=16)
+        f.pack()
+        huidig = [d for d in veld.get().split("+") if d]
+        vinkjes = {}
+        if not enkel:
+            ttk.Label(f, text="INGEDRUKT HOUDEN", style="Kop.TLabel").pack(anchor="w")
+            rij = ttk.Frame(f)
+            rij.pack(anchor="w", pady=(2, 10))
+            for m in ("ctrl", "alt", "shift", "win"):
+                vinkjes[m] = tk.BooleanVar(value=m in huidig)
+                ttk.Checkbutton(rij, text=toets_weergave(m), variable=vinkjes[m]).pack(side="left", padx=(0, 12))
+        ttk.Label(f, text="TOETS", style="Kop.TLabel").pack(anchor="w")
+        keuzes = [k for k in KIES_TOETSEN if k in pyd.KEYBOARD_MAPPING and not (enkel and k in GERESERVEERD)]
+        namen = [toets_weergave(k) for k in keuzes]
+        gewoon = [d for d in huidig if d not in MODIFIERS]
+        gekozen = tk.StringVar(value=toets_weergave(gewoon[0]) if gewoon and gewoon[0] in keuzes else "")
+        lijst = ttk.Combobox(f, textvariable=gekozen, values=namen, state="readonly", width=20, height=16)
+        lijst.pack(anchor="w", pady=(2, 0))
+        fout = ttk.Label(f, style="Fout.TLabel")
+        fout.pack(anchor="w", pady=(4, 0))
+
+        def ok(_e=None):
+            if not gekozen.get():
+                fout.configure(text="Kies een toets.")
+                return
+            toets = keuzes[namen.index(gekozen.get())]
+            delen = [m for m in ("ctrl", "alt", "shift", "win") if not enkel and vinkjes[m].get()] + [toets]
+            veld.set("+".join(delen))
+            top.destroy()
+            self._markeer_wijzigingen()
+
+        knoppen = ttk.Frame(f)
+        knoppen.pack(fill="x", pady=(12, 0))
+        ttk.Button(knoppen, text="OK", style="Primair.TButton", command=ok).pack(side="right")
+        ttk.Button(knoppen, text="Annuleren", command=top.destroy).pack(side="right", padx=(0, 8))
+        top.bind("<Return>", ok)
+        top.bind("<Escape>", lambda _e: top.destroy())
+        top.geometry(f"+{self.root.winfo_rootx() + 60}+{self.root.winfo_rooty() + 120}")
+        try:
+            top.grab_set()
+        except tk.TclError:
+            pass
+        lijst.focus_set()
+
+    # -- optie testen
+
+    def _optie_testen(self):
+        if self._opname_bezig or self._test is not None:
             return
-        is_trigger = isinstance(doel, str)
-        veld = v["trigger"] if is_trigger else doel
-        if not veld.winfo_exists():
+        self._bewaar_formulier()
+        b = self._bewerk
+        i = b["keuze"]
+        optie = b["concept"]["opties"][i]
+        reeks, fouten = valideer_reeks({"opties": [optie], "logboek": {"bewaardagen": BEWAAR_MIN}})
+        stapfouten = {f"{i}.{k[2:]}": m for k, m in fouten.items() if k.startswith("0.") and k != "0.naam"}
+        if stapfouten:
+            b["fouten"] = stapfouten
+            self._ververs_optielijst()
+            self._bouw_stappen()
+            self._velden["algemeen_fout"].configure(text="Los eerst de fouten in deze optie op. Daarna kunt u hem testen.")
             return
-        veld.delete(0, "end")
-        veld.insert(0, delen[0] if is_trigger else "+".join(delen))
-        self._markeer_wijzigingen()
+        self._toon_testvenster(optie["naam"] or "deze optie", reeks["opties"][0]["stappen"])
+
+    def _toon_testvenster(self, naam, stappen):
+        top = tk.Toplevel(self.root)
+        top.title(f"Optie testen – {naam}")
+        top.transient(self.root)
+        top.attributes("-topmost", True)
+        top.resizable(False, False)
+        top.configure(bg=WIT)
+        f = ttk.Frame(top, padding=16)
+        f.pack(fill="both", expand=True)
+        ttk.Label(f, text=f"Optie testen: {naam}", style="Titel.TLabel").pack(anchor="w")
+        ttk.Label(f, text="Krab stuurt de reeks naar het testvak hieronder, met de ingestelde wachttijden. Zo ziet u "
+                          "welke toetsen aankomen. Er gaat niets naar andere programma's: zodra dit venster niet "
+                          "meer vooraan staat, stopt de test.",
+                  style="Klein.TLabel", wraplength=440, justify="left").pack(anchor="w", pady=(6, 8))
+        vak = tk.Frame(f, bg=VLAK, height=44, takefocus=1, highlightthickness=2, highlightbackground=LIJN,
+                       highlightcolor=BLAUW)
+        vak.pack(fill="x")
+        vak.pack_propagate(False)
+        vak_tekst = tk.Label(vak, text="Testvak", bg=VLAK, fg=GRIJS, font=("Segoe UI", 10))
+        vak_tekst.pack(expand=True)
+        boom = ttk.Treeview(f, columns=("stap", "verwacht", "ontvangen", "tijd"), show="headings",
+                            height=min(max(len(stappen), 3), 10))
+        for kol, kop, breedte in (("stap", "Stap", 50), ("verwacht", "Verwacht", 150), ("ontvangen", "Ontvangen", 150),
+                                  ("tijd", "Na", 70)):
+            boom.heading(kol, text=kop, anchor="w")
+            boom.column(kol, width=breedte, anchor="w")
+        boom.tag_configure("goed", foreground=GROEN)
+        boom.tag_configure("fout", foreground=ROOD, background="#FDF1F0")
+        boom.pack(fill="x", pady=(10, 0))
+        uitslag = ttk.Label(f, style="Kop.TLabel", wraplength=440, justify="left")
+        uitslag.pack(anchor="w", pady=(8, 0))
+        knoppen = ttk.Frame(f)
+        knoppen.pack(fill="x", pady=(12, 0))
+        ttk.Button(knoppen, text="Sluiten", command=self._test_sluiten).pack(side="right")
+        start = ttk.Button(knoppen, text="Start test", style="Primair.TButton", command=self._test_start)
+        start.pack(side="right", padx=(0, 8))
+        self._test = {"venster": top, "vak": vak, "vak_tekst": vak_tekst, "boom": boom, "uitslag": uitslag,
+                      "start": start, "stappen": stappen, "stop": threading.Event(), "ontvangen": [],
+                      "volgorde": [], "ingedrukt": set(), "begin": time.monotonic(), "eerste": 0.0, "bezig": False}
+        self._vul_testtabel()
+        vak.bind("<KeyPress>", self._test_neer)
+        vak.bind("<KeyRelease>", self._test_op)
+        top.protocol("WM_DELETE_WINDOW", self._test_sluiten)
+        top.geometry(f"+{self.root.winfo_rootx() + 40}+{self.root.winfo_rooty() + 60}")
+        vak.focus_set()
+
+    def _vul_testtabel(self):
+        t = self._test
+        boom = t["boom"]
+        boom.delete(*boom.get_children())
+        for j, stap in enumerate(t["stappen"]):
+            boom.insert("", "end", iid=str(j), values=(j + 1, combi_weergave(stap["toetsen"]), "", ""))
+
+    @staticmethod
+    def _is_voorgrond(hwnd):
+        try:
+            return ctypes.windll.user32.GetForegroundWindow() == hwnd
+        except (AttributeError, OSError):
+            return False
+
+    def _test_start(self):
+        t = self._test
+        if not t or t["bezig"]:
+            return
+        t.update(ontvangen=[], volgorde=[], ingedrukt=set(), bezig=True)
+        t["stop"].clear()
+        self._vul_testtabel()
+        t["uitslag"].configure(text="Test loopt…", foreground=BLAUW)
+        t["vak_tekst"].configure(text="Testvak", fg=GRIJS)
+        t["start"].configure(state="disabled")
+        t["venster"].lift()
+        t["venster"].focus_force()
+        t["vak"].focus_set()
+        try:
+            hwnd = int(t["venster"].wm_frame(), 16)
+        except (tk.TclError, ValueError):
+            hwnd = 0
+        stappen = [(s["toetsen"].split("+"), s["wacht"]) for s in t["stappen"]]
+        stop = t["stop"]
+
+        def zender():
+            """Eigen thread; raakt Tk niet aan. Verstuurt alleen als het testvenster vooraan staat."""
+            if stop.wait(0.3):
+                return
+            t["begin"] = time.monotonic()
+            for j, (toetsen, wacht) in enumerate(stappen):
+                if stop.wait(wacht):
+                    return
+                if not self._is_voorgrond(hwnd):
+                    self._ui.put(("test", ("niet_actief", j)))
+                    return
+                druk_combinatie(toetsen)
+            if not stop.wait(0.5):
+                self._ui.put(("test", ("klaar", None)))
+
+        threading.Thread(target=zender, name="test", daemon=True).start()
+
+    def _test_neer(self, event):
+        t = self._test
+        if t and t["bezig"]:
+            naam = vk_naar_toets(event.keycode)
+            if naam is not None:
+                if not t["volgorde"]:
+                    t["eerste"] = time.monotonic()
+                t["ingedrukt"].add(naam)
+                if naam not in t["volgorde"]:
+                    t["volgorde"].append(naam)
+        return "break"
+
+    def _test_op(self, event):
+        t = self._test
+        if not t or not t["bezig"]:
+            return "break"
+        t["ingedrukt"].discard(vk_naar_toets(event.keycode))
+        if t["ingedrukt"] or not t["volgorde"]:
+            return "break"
+        combi = "+".join([m for m in ("ctrl", "alt", "shift", "win") if m in t["volgorde"]]
+                         + [d for d in t["volgorde"] if d not in MODIFIERS])
+        na = max(0.0, t["eerste"] - t["begin"])
+        t["ontvangen"].append((combi, na))
+        t["volgorde"] = []
+        j = len(t["ontvangen"]) - 1
+        if j < len(t["stappen"]):
+            t["boom"].set(str(j), "ontvangen", combi_weergave(combi))
+            t["boom"].set(str(j), "tijd", f"{formatteer_getal(na)} s")
+        t["vak_tekst"].configure(text=f"Ontvangen: {combi_weergave(combi)}", fg=TEKST)
+        return "break"
+
+    def _test_bericht(self, soort, data):
+        t = self._test
+        if not t:
+            return
+        t["bezig"] = False
+        t["start"].configure(state="normal")
+        if soort == "niet_actief":
+            t["uitslag"].configure(foreground=ROOD, text=f"Test gestopt vóór stap {data + 1}: het testvenster stond "
+                                                         "niet meer vooraan. Klik in dit venster en start de test opnieuw.")
+            return
+        verwacht = [s["toetsen"] for s in t["stappen"]]
+        ontvangen = [c for c, _ in t["ontvangen"]]
+        fout = 0
+        for j, combi in enumerate(verwacht):
+            goed = j < len(ontvangen) and ontvangen[j] == combi
+            fout += not goed
+            if j >= len(ontvangen):
+                t["boom"].set(str(j), "ontvangen", "niets")
+            t["boom"].item(str(j), tags=("goed" if goed else "fout",))
+        extra = len(ontvangen) - len(verwacht)
+        if not fout and extra <= 0:
+            t["uitslag"].configure(foreground=GROEN, text=f"✓ Alle {len(verwacht)} stappen kwamen goed aan.")
+        else:
+            delen = []
+            if fout:
+                delen.append(f"{fout} van de {len(verwacht)} stappen kwamen niet of anders aan")
+            if extra > 0:
+                delen.append(f"er kwamen {extra} toetsen meer aan dan verwacht")
+            t["uitslag"].configure(foreground=ROOD, text="✗ " + " en ".join(delen).capitalize() +
+                                   ". Controleer de toetscombinaties, of verhoog de wachttijden als het andere "
+                                   "programma traag reageert.")
+
+    def _test_sluiten(self):
+        t, self._test = self._test, None
+        if t:
+            t["stop"].set()
+            if t["venster"].winfo_exists():
+                t["venster"].destroy()
 
     # ------------------------------------------------------------ logboek
 
@@ -2420,6 +2850,10 @@ class App:
     # ------------------------------------------------------------ afsluiten
 
     def _afsluiten(self):
+        if self._opname_veld is not None and self._opname_veld.alt_ingedrukt():
+            return  # Alt+F4 tijdens het opnemen van een combinatie: niet afsluiten
+        if self._test is not None:
+            self._test_sluiten()
         self._stop_nu("Afgesloten")
         try:  # een eventuele stopmelding nog in het logboek zetten
             while True:

@@ -172,7 +172,7 @@ table.duo h2 { margin-top: 0; }
 <ul>
 <li>De blauwe balk toont dat de instellingen ontgrendeld zijn. Na 5 minuten zonder activiteit vergrendelen ze vanzelf. Wijzigingen die dan nog niet zijn opgeslagen, vervallen.</li>
 <li><b>Tabblad Opties:</b> bovenaan de starttoets. Links de lijst met opties, met knoppen om een optie toe te voegen, te kopiëren, te verwijderen of te verplaatsen. Rechts de naam en de stappen van de gekozen optie: per stap de toetscombinatie en de wachttijd vóór die stap (0,1 tot 10 seconden).</li>
-<li>Typ een combinatie, of klik op <b>Opnemen</b> en druk de combinatie in. Esc annuleert het opnemen. Met <b>+ Stap toevoegen</b> en ✕ voegt u stappen toe of haalt u ze weg.</li>
+<li>Met <b>+ Stap toevoegen</b> en ✕ voegt u stappen toe of haalt u ze weg. Hoe u een toetscombinatie invoert, staat hieronder.</li>
 <li>Een optie met een fout krijgt een ⚠ in de lijst. Bij opslaan springt het scherm naar de eerste optie met een fout.</li>
 <li><b>Standaard herstellen</b> zet Optie 1 en Optie 2 met hun oorspronkelijke combinaties terug. Andere opties vervallen dan.</li>
 <li><b>Tabblad Logboek:</b> de bewaartermijn (7 tot 3650 dagen) en de knop <b>Logmap openen</b>.</li>
@@ -180,10 +180,21 @@ table.duo h2 { margin-top: 0; }
 </ul>
 </td></tr></table>
 <!--pagina-->
+<h2>Toetscombinaties invoeren</h2>
+<table class="duo"><tr>
+<td class="beeld"><img src="kiezen.png" width="150"/><p class="bijschrift">Kiezen…</p></td>
+<td>
+<p>Typen is niet nodig. Er zijn twee manieren:</p>
+<ul>
+<li><b>Opnemen:</b> klik op het veld met de toetscombinatie en druk de toetsen in, bijvoorbeeld Ctrl, Alt en 1 tegelijk. Laat alle toetsen los: de combinatie verschijnt als losse toetsen. Esc annuleert.</li>
+<li><b>Kiezen…:</b> vink Ctrl, Alt, Shift of Win aan en kies de toets uit de lijst. Handig voor combinaties die Windows zelf onderschept, zoals Win+L.</li>
+</ul>
+<p>Het programma vangt de toetsen op in het eigen venster, op toetscode. De toetsenbordindeling en AltGr maken dus niet uit. Toetsen die Krab niet kan versturen, zoals die van het numerieke toetsenblok, worden geweigerd met een melding.</p>
+</td></tr></table>
+
 <h2>Regels voor toetscombinaties</h2>
 <table>
 <tr><th>Regel</th><th>Voorbeeld</th></tr>
-<tr><td>Toetsen met een + ertussen</td><td><span class="k">ctrl+alt+1</span></td></tr>
 <tr><td>Minstens één gewone toets naast ctrl, alt, shift of win</td><td><span class="k">ctrl+alt</span> kan niet</td></tr>
 <tr><td>Geen Esc, die is voor stoppen</td><td><span class="k">ctrl+esc</span> kan niet</td></tr>
 <tr><td>Dezelfde toets mag vaker in één optie voorkomen</td><td>twee keer <span class="k">tab</span> kan wel</td></tr>
@@ -191,6 +202,19 @@ table.duo h2 { margin-top: 0; }
 <tr><td>Maximaal 10 opties, elk met 1 tot 10 stappen</td><td></td></tr>
 <tr><td>Starttoets: één gewone toets, niet Esc en niet F1</td><td><span class="k">f9</span></td></tr>
 </table>
+
+<!--pagina-->
+<table class="duo"><tr>
+<td class="beeld"><img src="testen.png" width="200"/><p class="bijschrift">Optie testen</p></td>
+<td>
+<h2>Optie testen</h2>
+<p>Klik op <b>Optie testen…</b> om de gekozen optie te proberen voordat u opslaat. Krab stuurt de reeks dan naar een testvak in een eigen venster, met de ingestelde wachttijden, en laat per stap zien wat er aankwam.</p>
+<ul>
+<li>Groen: de stap kwam goed aan. Rood: er kwam niets of iets anders aan.</li>
+<li>Er gaat niets naar andere programma's. Staat het testvenster niet meer vooraan, dan stopt de test vóór de volgende stap.</li>
+<li>De test gebruikt wat op het scherm staat, ook als dat nog niet is opgeslagen.</li>
+</ul>
+</td></tr></table>
 
 <table class="duo"><tr>
 <td class="beeld"><img src="bevestigen.png" width="200"/><p class="bijschrift">Bevestigen, met oud en nieuw naast elkaar</p></td>
@@ -284,6 +308,7 @@ table.duo h2 { margin-top: 0; }
 <h2>De reeks doet iets anders dan verwacht</h2>
 <ul>
 <li>Druk direct op Esc.</li>
+<li>Probeer de optie met <b>Optie testen…</b> in de instellingen (hoofdstuk 5).</li>
 <li>Kijk in het andere programma welke stappen zijn uitgevoerd.</li>
 <li>Zijn de sneltoetsen van het andere programma veranderd, bijvoorbeeld na een update? Laat beheer de combinaties aanpassen.</li>
 <li>Reageert het andere programma trager dan normaal? Laat beheer de wachttijden verhogen.</li>

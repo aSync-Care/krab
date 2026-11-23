@@ -215,8 +215,8 @@ ok('Nog 4 pogingen' in tekst_in_scherm(), 'foute pincode: nog 4 pogingen')
 zet(entries()[0], '482915'); knop('Ontgrendelen').invoke(); pump()
 v = app._velden
 ok(app._ontgrendeld and v['lijst'].size() == 2 and len(v['stap_rijen']) == 3, 'ontgrendeld, Optie 1 met 3 stappen')
-zet(v['stap_rijen'][0][0], 'ctrl+shift+1'); app._markeer_wijzigingen()
-ok(str(v['stap_rijen'][0][0].cget('style')) == 'Gewijzigd.TEntry', 'gewijzigd veld blauw')
+v['stap_rijen'][0][0].set('ctrl+shift+1'); app._markeer_wijzigingen()
+ok(v['stap_rijen'][0][0].stijl == 'gewijzigd', 'gewijzigd veld blauw')
 app._optie_toevoegen(); pump()
 ok(app._velden['lijst'].size() == 3 and app._bewerk['keuze'] == 2, 'optie toegevoegd en gekozen')
 zet(app._velden['naam'], 'Snel'); app._naam_getypt(); app._stap_toevoegen(); pump()
@@ -236,6 +236,71 @@ ok(c['versie'] == 2 and [o['naam'] for o in c['opties']] == ['Optie 1', 'Optie 2
    'versie 2 opgeslagen met drie opties')
 ok(not app._ontgrendeld and 'Opgeslagen als versie 2' in tekst_in_scherm()
    and 'Snel  –  2 stappen' in tekst_in_scherm(), 'weer vergrendeld, nieuwe optie op hoofdscherm')
+
+print('opnemen, kiezen en testen')
+
+
+def Ev(keycode, keysym=''):
+    return type('Ev', (), {'keycode': keycode, 'keysym': keysym})()
+
+
+def druk(veld, *codes):
+    """Simuleert indrukken en weer loslaten van toetsen op Windows-toetscode."""
+    for c in codes:
+        veld._toets_neer(Ev(c))
+    for c in reversed(codes):
+        veld._toets_op(Ev(c))
+
+
+ontgrendel()
+veld = app._velden['stap_rijen'][1][0]
+veld._klik(); ok(veld.opname and app._opname_bezig, 'klik op een toetscombinatie start het opnemen')
+druk(veld, 0x11, 0x12, 0x35)
+ok(veld.get() == 'ctrl+alt+5' and not veld.opname and veld.stijl == 'gewijzigd', 'Ctrl+Alt+5 opgenomen')
+veld._klik(); druk(veld, 0x10, 0x11)
+ok(veld.opname and 'gewone toets' in app._velden['opname_label'].cget('text'), 'alleen Ctrl+Shift: melding, blijft opnemen')
+druk(veld, 0x61)
+ok(veld.opname and 'kan Krab niet versturen' in app._velden['opname_label'].cget('text'), 'numerieke toets geweigerd')
+druk(veld, 0x1B); ok(not veld.opname and veld.get() == 'ctrl+alt+5', 'Esc annuleert, oude waarde blijft')
+veld._klik(); veld._toets_neer(Ev(0x12)); veld._toets_neer(Ev(0x73))  # Alt en F4 ingedrukt
+app._afsluiten(); ok(r.winfo_exists(), 'Alt+F4 tijdens opnemen sluit het programma niet')
+veld._toets_op(Ev(0x73)); veld._toets_op(Ev(0x12))
+ok(veld.get() == 'alt+f4', 'Alt+F4 is gewoon opgenomen als combinatie')
+trig = app._velden['trigger']
+trig._klik(); ok(not trig.opname, 'starttoets-veld is uitgeschakeld bij "Elke toets"')
+app._velden['trigger_modus'].set('vast'); app._trigger_modus_gewijzigd()
+trig._klik(); trig._toets_neer(Ev(0x11)); ok(trig.opname, 'starttoets: Ctrl alleen wordt niet geaccepteerd')
+trig._toets_neer(Ev(0x70)); ok(trig.opname and 'F1' in app._velden['opname_label'].cget('text'), 'F1 gereserveerd')
+trig._toets_neer(Ev(0x78)); ok(trig.get() == 'f9' and not trig.opname, 'F9 als starttoets opgenomen')
+veld.set('ctrl+alt+5')
+app._kies_toets(veld); pump(0.1)
+kies = app._kies_venster
+vinkjes = [w for w in alle(kies) if isinstance(w, ttk.Checkbutton)]
+for w in vinkjes:
+    if w.cget('text') in ('Alt', 'Shift'):
+        w.invoke()  # Ctrl+Alt stond aan -> Ctrl+Shift
+[w for w in alle(kies) if isinstance(w, ttk.Combobox)][0].set('Tab')
+[w for w in alle(kies) if isinstance(w, ttk.Button) and w.cget('text') == 'OK'][0].invoke(); pump(0.1)
+ok(veld.get() == 'ctrl+shift+tab' and not kies.winfo_exists(), 'kiezen: Ctrl+Shift+Tab')
+app._is_voorgrond = lambda hwnd: True
+app._optie_testen(); pump(0.1)
+ok(app._test is not None and len(app._test['boom'].get_children()) == 3, 'testvenster met 3 stappen')
+app._test_start(); vak = app._test
+for combi in (['ctrl', 'shift', 'tab'], ['ctrl', 'shift', 'tab'], ['ctrl', 'alt', '3']):
+    codes = {'ctrl': 0x11, 'shift': 0x10, 'alt': 0x12, 'tab': 0x09, '3': 0x33}
+    for k in combi:
+        app._test_neer(Ev(codes[k]))
+    for k in reversed(combi):
+        app._test_op(Ev(codes[k]))
+pump(1.5)
+ok(vak['uitslag'].cget('text').startswith('✗') and 'fout' in vak['boom'].item('0', 'tags'),
+   'test toont dat stap 1 anders aankwam dan verwacht')
+ok('goed' in vak['boom'].item('1', 'tags') and 'goed' in vak['boom'].item('2', 'tags'), 'stap 2 en 3 goed')
+app._is_voorgrond = lambda hwnd: False
+app._test_start(); pump(0.8)
+ok('niet meer vooraan' in vak['uitslag'].cget('text'), 'test stopt als het testvenster niet vooraan staat')
+app._test_sluiten(); ok(app._test is None, 'testvenster gesloten')
+klik('Vergrendelen')
 
 print('kopiëren, verplaatsen, verwijderen')
 ontgrendel()

@@ -59,10 +59,10 @@ class _BIH(ctypes.Structure):
                 ("biYPelsPerMeter", ctypes.c_long), ("biClrUsed", wt.DWORD), ("biClrImportant", wt.DWORD)]
 
 
-def venster_afbeelding():
-    """Legt het venster vast met PrintWindow; werkt ook als het scherm vergrendeld is."""
+def venster_afbeelding(venster=None):
+    """Legt een venster vast met PrintWindow; werkt ook als het scherm vergrendeld is."""
     u32, g32 = ctypes.windll.user32, ctypes.windll.gdi32
-    hwnd = u32.GetParent(r.winfo_id())
+    hwnd = int((venster or r).wm_frame(), 16)
     rc = wt.RECT()
     u32.GetWindowRect(hwnd, ctypes.byref(rc))
     zichtbaar = wt.RECT()  # zonder de onzichtbare randen van Windows 10/11
@@ -84,9 +84,9 @@ def venster_afbeelding():
                        zichtbaar.right - rc.left, zichtbaar.bottom - rc.top))
 
 
-def foto(naam):
+def foto(naam, venster=None):
     pomp(0.5)
-    venster_afbeelding().save(os.path.join(UIT, naam + ".png"))
+    venster_afbeelding(venster).save(os.path.join(UIT, naam + ".png"))
     print("gemaakt:", naam)
 
 
@@ -174,7 +174,7 @@ lijst = app._velden["lijst"]
 lijst.selection_clear(0, "end")
 lijst.selection_set(0)
 app._optie_gekozen()
-zet(app._velden["stap_rijen"][0][0], "ctrl+shift+1")
+app._velden["stap_rijen"][0][0].set("ctrl+shift+1")
 zet(app._velden["stap_rijen"][2][2], "1,5")
 app._markeer_wijzigingen()
 app._laatste_activiteit = time.monotonic() - 28
@@ -182,6 +182,33 @@ foto("instellingen-wijzigen")
 app._velden["notebook"].select(1)
 foto("instellingen-logboek")
 app._velden["notebook"].select(0)
+
+# Kiezen…
+app._kies_toets(app._velden["stap_rijen"][1][0])
+foto("kiezen", app._kies_venster)
+app._kies_venster.destroy()
+
+# Optie testen: de toetsen 'komen aan' op de momenten dat de echte test ze zou sturen
+TOETSCODE = {"ctrl": 0x11, "alt": 0x12, "shift": 0x10, "1": 0x31, "2": 0x32, "3": 0x33}
+app._is_voorgrond = lambda hwnd: True
+app._optie_testen()
+app._test_start()
+
+
+def aankomst(combi):
+    for k in combi:
+        app._test_neer(type("E", (), {"keycode": TOETSCODE[k], "keysym": ""})())
+    for k in reversed(combi):
+        app._test_op(type("E", (), {"keycode": TOETSCODE[k], "keysym": ""})())
+
+
+moment = 300
+for stap in app._test["stappen"]:
+    moment += int(float(stap["wacht"]) * 1000) + 60
+    r.after(moment, lambda c=stap["toetsen"].split("+"): aankomst(c))
+pomp(moment / 1000 + 1.2)
+foto("testen", app._test["venster"])
+app._test_sluiten()
 klik("Opslaan…")
 zet(velden()[0], "Optie Snel toegevoegd, sneltoets aangepast")
 foto("bevestigen")
