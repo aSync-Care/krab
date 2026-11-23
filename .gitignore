@@ -1,0 +1,12 @@
+build/
+dist/
+__pycache__/
+*.pyc
+
+# Gegevens die het programma aanmaakt bij gebruik vanuit de broncode
+instellingen.json
+instellingen.reserve.json
+instellingen.json.tmp-*
+wijzigingen.log
+logboek/
+locatie.txt

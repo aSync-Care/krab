@@ -1,0 +1,337 @@
+<!--
+  Bron van de handleiding van Krab.
+  Bouwen: python handleiding/bouw_handleiding.py  (maakt handleiding.pdf en handleiding_paginas.json)
+  Elke <section> begint op een nieuwe pagina. Het id is het onderwerp waar Help naartoe springt:
+  waarschuwing, hoofdscherm, instellingen, wijzigen, logboek, problemen, inrichten.
+  <!--pagina--> binnen een section dwingt een nieuwe pagina af.
+  Een tabel met class="duo" zet een schermafdruk (links) naast de uitleg (rechts); kop en
+  afbeelding blijven zo bij elkaar.
+  Afbeeldingen komen uit handleiding/afbeeldingen (maak ze met maak_schermafdrukken.py).
+-->
+<style>
+body { font-family: sans-serif; font-size: 10pt; line-height: 1.42; color: #1E2733; }
+h1 { font-size: 19pt; color: #1F5FA8; margin: 0 0 12pt 0; }
+h2 { font-size: 12.5pt; color: #1E2733; margin: 14pt 0 4pt 0; }
+h3 { font-size: 10.5pt; margin: 10pt 0 3pt 0; }
+p { margin: 0 0 6pt 0; }
+ul, ol { margin: 0 0 7pt 0; padding-left: 16pt; }
+li { margin: 0 0 3pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 3pt 0 9pt 0; }
+th, td { border: 0.6pt solid #D8DEE6; padding: 3pt 5pt; vertical-align: top; font-size: 9.2pt; text-align: left; }
+th { background-color: #F3F5F8; font-weight: bold; }
+table.duo { margin: 8pt 0 6pt 0; }
+table.duo td { border: none; padding: 0 0 0 14pt; font-size: 10pt; }
+table.duo td.beeld { padding: 2pt 0 0 0; width: 205pt; text-align: center; }
+table.duo h2 { margin-top: 0; }
+.let { background-color: #FFF4E0; border: 0.8pt solid #E0A12E; color: #6B4200; padding: 6pt 8pt; margin: 6pt 0 9pt 0; }
+.tip { background-color: #EAF1FA; border: 0.8pt solid #1F5FA8; color: #173F6E; padding: 6pt 8pt; margin: 6pt 0 9pt 0; }
+.fig { text-align: center; margin: 6pt 0 0 0; }
+.bijschrift { text-align: center; font-size: 8.5pt; color: #5C6878; margin: 3pt 0 8pt 0; }
+.k { font-family: monospace; font-size: 9.2pt; }
+.klein { font-size: 8.8pt; color: #5C6878; }
+.titel { font-size: 30pt; color: #1F5FA8; font-weight: bold; margin: 0; }
+.ondertitel { font-size: 13pt; color: #5C6878; margin: 2pt 0 18pt 0; }
+.inhoud td { border: none; border-bottom: 0.6pt solid #E6EAF0; font-size: 10.5pt; padding: 4pt 2pt; }
+</style>
+
+<section id="waarschuwing" data-titel="Wat het programma doet en de risico's">
+<p>Krab neemt herhalend toetswerk over. Na elke toetsaanslag stuurt het programma een vaste reeks sneltoetsen naar het venster dat op dat moment actief is:</p>
+<ol>
+<li><b>Stap 1</b>, standaard <span class="k">Ctrl+Alt+1</span></li>
+<li><b>Stap 2</b>, standaard <span class="k">Ctrl+Alt+2</span></li>
+<li><b>Stap 3</b>, standaard <span class="k">Ctrl+Alt+3</span>. Alleen in modus <i>Alle stappen</i>.</li>
+</ol>
+<p>De toetscombinaties zijn in te stellen. Vóór elke stap wacht het programma even, zodat het andere programma de vorige sneltoets kan verwerken.</p>
+
+<h2>Wat het programma niet doet</h2>
+<ul>
+<li>Het kijkt niet naar wat er op het scherm staat.</li>
+<li>Het controleert niet welk venster actief is. Staat een ander programma vooraan, dan gaan de sneltoetsen daarheen.</li>
+<li>Het controleert niet of een sneltoets het bedoelde resultaat had.</li>
+<li>Het leest geen gegevens uit andere programma's en legt die ook nergens vast.</li>
+</ul>
+<div class="let"><b>U blijft verantwoordelijk.</b> Alles wat het programma via sneltoetsen uitvoert, geldt als een handeling van uzelf. Controleer zelf wat er gebeurt voordat u de starttoets indrukt.</div>
+
+<table class="duo"><tr>
+<td class="beeld"><img src="waarschuwing.png" width="190"/><p class="bijschrift">De waarschuwing bij het starten</p></td>
+<td>
+<h2>De waarschuwing bij het starten</h2>
+<p>Bij elke start toont het programma eerst een waarschuwing. Zet het vinkje en klik op <b>Akkoord</b> om verder te gaan. <b>Afsluiten</b> sluit het programma. Via <b>Handleiding</b> opent u dit document.</p>
+<h2>Voorwaarden</h2>
+<ul>
+<li>Gebruik Krab niet waar een verkeerde of onbedoelde toetsaanslag kan leiden tot letsel of andere ernstige schade.</li>
+<li>Gebruik het programma alleen als uw organisatie dit toestaat.</li>
+<li>Krab is open source onder de MIT-licentie. Het wordt gratis gedeeld en geleverd zoals het is, zonder garantie, onderhoud of ondersteuning.</li>
+<li>De makers zijn niet aansprakelijk voor fouten of schade door het gebruik ervan, voor zover de wet dat toestaat.</li>
+</ul>
+</td></tr></table>
+</section>
+
+<section id="hoofdscherm" data-titel="Starten, stoppen en Esc">
+<table class="duo"><tr>
+<td class="beeld"><img src="hoofdscherm.png" width="190"/><p class="bijschrift">Het hoofdscherm</p></td>
+<td>
+<h2>Zo werkt u ermee</h2>
+<ol>
+<li>Kies de modus.</li>
+<li>Controleer de reeks.</li>
+<li>Klik op <b>Start</b>. De status wordt groen: <i>Actief</i>.</li>
+<li>Klik in het venster waar de sneltoetsen naartoe moeten.</li>
+<li>Controleer wat er op het scherm staat. Druk daarna op de starttoets.</li>
+<li>Wacht tot de status weer <i>Actief – wacht op toets</i> is voordat u verdergaat.</li>
+</ol>
+<div class="tip">Toetsen die u indrukt terwijl een reeks loopt, worden genegeerd. Ook de sneltoetsen die het programma zelf verstuurt, starten geen nieuwe reeks.</div>
+</td></tr></table>
+
+<h2>Het hoofdscherm</h2>
+<table>
+<tr><th>Onderdeel</th><th>Betekenis</th></tr>
+<tr><td>Modus</td><td><i>Alle stappen</i> of <i>Zonder stap 3</i>. Zie hoofdstuk 3.</td></tr>
+<tr><td>Reeks per toetsaanslag</td><td>De stappen die het programma uitvoert, met de toetscombinatie en de wachttijd vóór elke stap.</td></tr>
+<tr><td>Start met</td><td>De toets waarmee u een reeks start.</td></tr>
+<tr><td>Centraal beheerd</td><td>Versie en datum van de instellingen die voor iedereen gelden.</td></tr>
+<tr><td>Start en Stop (Esc)</td><td>Zet het programma aan en uit.</td></tr>
+<tr><td>Status en Reeksen</td><td>Wat het programma nu doet, en hoeveel reeksen sinds Start volledig zijn uitgevoerd.</td></tr>
+<tr><td>Logboek en Help</td><td>Openen het logboek (hoofdstuk 6) en deze handleiding.</td></tr>
+</table>
+<!--pagina-->
+<table class="duo"><tr>
+<td class="beeld"><img src="hoofdscherm-actief.png" width="190"/><p class="bijschrift">Actief, na 14 reeksen</p></td>
+<td>
+<h2>Stoppen</h2>
+<ul>
+<li><b>Esc stopt altijd direct.</b> Dat werkt ook als een ander programma het actieve venster is, en ook midden in een reeks. Een lopende reeks stopt bij de eerstvolgende wachttijd en de resterende stappen worden overgeslagen.</li>
+<li>De knop <b>Stop</b> doet hetzelfde.</li>
+<li>Het programma sluiten stopt het ook.</li>
+</ul>
+<div class="let">Is een reeks afgebroken, kijk dan eerst in het andere programma welke stappen zijn uitgevoerd voordat u verdergaat. In het logboek staat na welke stap de reeks stopte.</div>
+<h2>Controleer de telling</h2>
+<p><b>Reeksen</b> telt hoeveel reeksen sinds Start volledig zijn uitgevoerd. Vergelijk dit met het aantal keer dat u bewust de starttoets heeft ingedrukt.</p>
+</td></tr></table>
+
+<h2>Help en F1</h2>
+<p>De knop <b>Help</b>, of <span class="k">F1</span> als Krab het actieve venster is, opent deze handleiding in de browser op de pagina die bij het scherm hoort.</p>
+</section>
+
+<section id="modus" data-titel="Modus en starttoets">
+<h2>Modus</h2>
+<table>
+<tr><th>Modus</th><th>Stappen per reeks</th></tr>
+<tr><td>Alle stappen</td><td>Stap 1, 2 en 3</td></tr>
+<tr><td>Zonder stap 3</td><td>Stap 1 en 2</td></tr>
+</table>
+<p>De modus kiest u zelf. Het programma onthoudt hem op deze pc. Terwijl het programma actief is, kunt u de modus niet wijzigen.</p>
+
+<h2>Starttoets</h2>
+<p>Beheer bepaalt welke toets een reeks start:</p>
+<ul>
+<li><b>Eén vaste toets</b>, bijvoorbeeld <span class="k">F9</span>. Aanbevolen: alleen die toets start een reeks.</li>
+<li><b>Elke toets.</b> Elke toets behalve Esc start een reeks. Ook typen in welk programma dan ook start dan een reeks.</li>
+</ul>
+<div class="let">Staat de starttoets op <i>elke toets</i>, typ dan niets terwijl het programma actief is. Stop eerst met Esc.</div>
+
+<h2>Centraal beheerd</h2>
+<p>De toetscombinaties, wachttijden en de starttoets gelden voor alle gebruikers en staan in één centraal bestand. De regel <i>Centraal beheerd · versie 7 · 21-11-2026</i> op het hoofdscherm laat zien welke versie u gebruikt.</p>
+<p>Bij elke klik op Start leest het programma de centrale instellingen opnieuw. Een wijziging door beheer geldt dus vanaf uw volgende Start, zonder het programma opnieuw op te starten.</p>
+</section>
+
+<section id="instellingen" data-titel="Instellingen bekijken">
+<table class="duo"><tr>
+<td class="beeld"><img src="instellingen-lezen.png" width="190"/><p class="bijschrift">Instellingen, alleen-lezen</p></td>
+<td>
+<p>Klik op het hoofdscherm op <b>Instellingen</b>. Dat kan alleen als het programma gestopt is.</p>
+<p>Iedereen kan de instellingen bekijken. Wijzigen kan alleen met de beheerpincode (hoofdstuk 5).</p>
+<p><b>Terug</b> brengt u naar het hoofdscherm. <b>Ontgrendelen</b> vraagt om de beheerpincode.</p>
+</td></tr></table>
+<table>
+<tr><th>Onderdeel</th><th>Betekenis</th></tr>
+<tr><td>Start de reeks met</td><td>Eén vaste toets, of elke toets.</td></tr>
+<tr><td>Stappen</td><td>Per stap de toetscombinatie en de wachttijd vóór die stap (<i>na 1,8 s</i>). Een * betekent: alleen in modus <i>Alle stappen</i>.</td></tr>
+<tr><td>Logboek</td><td>Hoeveel dagen het logboek bewaard blijft.</td></tr>
+<tr><td>Versie</td><td>Versienummer, datum, de pc waarop is opgeslagen en de reden van de laatste wijziging.</td></tr>
+</table>
+</section>
+
+<section id="wijzigen" data-titel="Instellingen wijzigen met de pincode">
+<div class="let"><b>Wijzigingen gelden voor alle gebruikers</b>, op alle pc's, vanaf hun volgende Start. Wijzig alleen na overleg en test daarna of de reeks doet wat de bedoeling is.</div>
+
+<table class="duo"><tr>
+<td class="beeld"><img src="pincode.png" width="170"/><p class="bijschrift">Na een onjuiste pincode</p></td>
+<td>
+<h2>Ontgrendelen</h2>
+<ol>
+<li>Klik op het hoofdscherm op <b>Instellingen</b> en dan op <b>Ontgrendelen</b>.</li>
+<li>Vul de pincode van 6 cijfers in en klik op <b>Ontgrendelen</b>.</li>
+</ol>
+<p>Na 5 onjuiste pogingen kunt u 60 seconden geen pincode invoeren. Elke onjuiste poging komt in het logboek.</p>
+</td></tr></table>
+
+<table class="duo"><tr>
+<td class="beeld"><img src="instellingen-wijzigen.png" width="200"/><p class="bijschrift">Ontgrendeld: gewijzigde velden zijn blauw</p></td>
+<td>
+<h2>Aanpassen</h2>
+<ul>
+<li>De blauwe balk toont dat de instellingen ontgrendeld zijn. Na 5 minuten zonder activiteit vergrendelen ze vanzelf. Wijzigingen die dan nog niet zijn opgeslagen, vervallen.</li>
+<li><b>Tabblad Reeks:</b> de starttoets, en per stap de toetscombinatie en de wachttijd vóór die stap (0,1 tot 10 seconden). Typ een combinatie, of klik op <b>Opnemen</b> en druk de combinatie in. Esc annuleert het opnemen.</li>
+<li><b>Standaard herstellen</b> zet de oorspronkelijke combinaties en wachttijden terug.</li>
+<li><b>Tabblad Logboek:</b> de bewaartermijn (7 tot 3650 dagen) en de knop <b>Logmap openen</b>.</li>
+<li><b>Vergrendelen</b> sluit de instellingen zonder op te slaan.</li>
+</ul>
+</td></tr></table>
+<!--pagina-->
+<h2>Regels voor toetscombinaties</h2>
+<table>
+<tr><th>Regel</th><th>Voorbeeld</th></tr>
+<tr><td>Toetsen met een + ertussen</td><td><span class="k">ctrl+alt+1</span></td></tr>
+<tr><td>Minstens één gewone toets naast ctrl, alt, shift of win</td><td><span class="k">ctrl+alt</span> kan niet</td></tr>
+<tr><td>Geen Esc, die is voor stoppen</td><td><span class="k">ctrl+esc</span> kan niet</td></tr>
+<tr><td>Elke stap heeft een eigen combinatie</td><td>twee keer <span class="k">ctrl+alt+1</span> kan niet</td></tr>
+<tr><td>Starttoets: één gewone toets, niet Esc en niet F1</td><td><span class="k">f9</span></td></tr>
+</table>
+
+<table class="duo"><tr>
+<td class="beeld"><img src="bevestigen.png" width="200"/><p class="bijschrift">Bevestigen, met oud en nieuw naast elkaar</p></td>
+<td>
+<h2>Opslaan</h2>
+<ol>
+<li>Klik op <b>Opslaan…</b>. Het volgende scherm toont precies wat er verandert.</li>
+<li>Vul de reden van de wijziging in. Die is verplicht en komt in het logboek.</li>
+<li>Klik op <b>Opslaan voor iedereen</b>.</li>
+</ol>
+<p>De instellingen krijgen een nieuw versienummer en zijn meteen weer vergrendeld. Andere pc's gebruiken de nieuwe versie vanaf hun volgende Start. Wie op dat moment actief is, werkt door met de oude reeks tot een nieuwe Start.</p>
+</td></tr></table>
+
+<h2>Pincode wijzigen</h2>
+<p>Klik in het ontgrendelde scherm op <b>Pincode wijzigen</b>. Vul de huidige pincode in en twee keer de nieuwe. De pincode bestaat uit 6 cijfers, niet zes keer hetzelfde cijfer en geen oplopende of aflopende reeks zoals 123456. Sla eerst andere wijzigingen op.</p>
+</section>
+
+<section id="logboek" data-titel="Het logboek">
+<p>Klik op het hoofdscherm op <b>Logboek</b>. Dat kan als het programma gestopt is. Het logboek legt vast wat het programma heeft gedaan. Er staan geen namen in en niets van wat er op het scherm staat. Wel staat de naam van de pc erbij.</p>
+<p class="fig"><img src="logboek.png" width="380"/></p>
+<p class="bijschrift">Het logboek van vandaag op deze pc</p>
+<table>
+<tr><th>Soort</th><th>Wanneer</th></tr>
+<tr><td>OPEN</td><td>Het programma is gestart.</td></tr>
+<tr><td>AKKOORD</td><td>De waarschuwing is geaccepteerd.</td></tr>
+<tr><td>START</td><td>Klik op Start, met modus, starttoets en versie van de instellingen.</td></tr>
+<tr><td>REEKS</td><td>Een reeks is volledig verstuurd, met de combinaties en de duur.</td></tr>
+<tr><td>AFGEBROKEN</td><td>Esc of Stop midden in een reeks, met de stap waarna is gestopt. Oranje.</td></tr>
+<tr><td>STOP</td><td>Gestopt met de knop, Esc of afsluiten, met het aantal reeksen.</td></tr>
+<tr><td>FOUT</td><td>Er ging iets mis, bijvoorbeeld de centrale map was niet bereikbaar. Rood.</td></tr>
+<tr><td>INSTELLINGEN</td><td>Ontgrendelen, onjuiste pincode, opslaan (met wijziging en reden), reservekopie, pincode. Blauw.</td></tr>
+</table>
+<!--pagina-->
+<h2>Filteren en exporteren</h2>
+<ul>
+<li><b>Pc:</b> deze pc, alle pc's of één andere pc.</li>
+<li><b>Periode:</b> vandaag, de afgelopen 7 of 30 dagen, of alles.</li>
+<li><b>Soort:</b> starten en stoppen, reeksen, fouten of instellingen.</li>
+<li><b>Exporteren (CSV)</b> bewaart wat in beeld staat als bestand voor Excel.</li>
+<li><b>Logmap openen</b> opent de map met de logbestanden.</li>
+</ul>
+<h2>Bewaren</h2>
+<p>Het logboek staat in de centrale map, per pc één bestand per dag. Regels die ouder zijn dan de bewaartermijn (standaard 90 dagen) verwijdert het programma automatisch.</p>
+<h2>Als de centrale map wegvalt</h2>
+<p>Valt de netwerkmap weg terwijl het programma loopt, dan bewaart het programma het logboek tijdelijk op de pc zelf. Onderin het hoofdscherm staat dan een oranje melding. Zodra de map weer bereikbaar is, zet het programma de regels over. Er gaat niets verloren.</p>
+<div class="let">Het logboek is bedoeld om terug te kijken en problemen op te lossen. Als bewijsstuk is het niet sluitend, omdat de centrale map voor alle gebruikers schrijfbaar is.</div>
+</section>
+
+<section id="problemen" data-titel="Problemen oplossen">
+<table class="duo"><tr>
+<td class="beeld"><img src="geblokkeerd.png" width="185"/><p class="bijschrift">Instellingen buiten het programma om gewijzigd</p></td>
+<td>
+<h2>Starten geblokkeerd</h2>
+<p><b>Wat er aan de hand is.</b> Het centrale instellingenbestand is buiten Krab om gewijzigd, beschadigd of verwijderd. Om fouten te voorkomen kan niemand starten.</p>
+<p><b>Wat te doen.</b> Iemand met de beheerpincode klikt op <b>Reservekopie terugzetten</b> en vult de pincode in. De laatst opgeslagen versie komt dan terug.</p>
+<p>Is er geen bruikbare reservekopie, dan moet beheer de centrale map leegmaken en het programma opnieuw inrichten (hoofdstuk 8).</p>
+</td></tr></table>
+
+<table class="duo"><tr>
+<td class="beeld"><img src="onbereikbaar.png" width="185"/><p class="bijschrift">De centrale map kan niet worden geopend</p></td>
+<td>
+<h2>Centrale instellingen niet bereikbaar</h2>
+<p>Controleer de netwerkverbinding en klik op <b>Opnieuw proberen</b>.</p>
+<p>Blijft het probleem bestaan, neem dan contact op met uw ICT-afdeling. De melding noemt de map waarin het programma zoekt.</p>
+<h2>Niet opgeslagen: iemand anders was u voor</h2>
+<p>Twee mensen wijzigden de instellingen tegelijk op verschillende pc's. Wie als tweede opslaat, krijgt deze melding. Er is niets overschreven. Klik op <b>Nieuwe versie laden</b>, bekijk de actuele instellingen en voer uw wijziging zo nodig opnieuw in.</p>
+</td></tr></table>
+<!--pagina-->
+<h2>Te veel onjuiste pogingen</h2>
+<p>Na 5 onjuiste pincodes of herstelcodes wacht u 60 seconden. Daarna kunt u het opnieuw proberen.</p>
+
+<h2>Pincode vergeten</h2>
+<ol>
+<li>Klik in het pincodescherm op <b>Pincode vergeten?</b></li>
+<li>Vul de herstelcode in die bij het inrichten is getoond.</li>
+<li>Kies een nieuwe pincode.</li>
+<li>Bewaar de nieuwe herstelcode die het programma toont. De oude herstelcode werkt dan niet meer.</li>
+</ol>
+<p>De instellingen zelf veranderen niet. Is ook de herstelcode kwijt, dan moet beheer de centrale map leegmaken en opnieuw inrichten.</p>
+
+<h2>Automatisch vergrendeld</h2>
+<p>Na 5 minuten zonder activiteit vergrendelen de instellingen vanzelf. Wijzigingen die nog niet waren opgeslagen, zijn vervallen. Ontgrendel opnieuw en voer ze opnieuw in.</p>
+
+<h2>De reeks start niet</h2>
+<ul>
+<li>Staat de status op <i>Actief</i>? Zo niet, klik op Start.</li>
+<li>Drukt u op de juiste starttoets? Die staat op het hoofdscherm onder <i>Start met</i>.</li>
+<li>Loopt er nog een reeks? Wacht dan tot de status <i>wacht op toets</i> is.</li>
+</ul>
+
+<h2>De reeks doet iets anders dan verwacht</h2>
+<ul>
+<li>Druk direct op Esc.</li>
+<li>Kijk in het andere programma welke stappen zijn uitgevoerd.</li>
+<li>Zijn de sneltoetsen van het andere programma veranderd, bijvoorbeeld na een update? Laat beheer de combinaties aanpassen.</li>
+<li>Reageert het andere programma trager dan normaal? Laat beheer de wachttijden verhogen.</li>
+</ul>
+
+<h2>De handleiding opent niet in de browser</h2>
+<p>Kan het programma geen browser starten, dan opent het de handleiding in het pdf-programma. Die begint altijd op pagina 1. In het logboek staat dan een melding.</p>
+</section>
+
+<section id="inrichten" data-titel="Eerste inrichting (voor beheer)">
+<h2>Voorbereiden</h2>
+<ul>
+<li>Kies een centrale map, bijvoorbeeld op een netwerkschijf. Zet de exe in die map. Staat de exe op elke pc lokaal, zet dan naast de exe een bestand <span class="k">locatie.txt</span> met op de eerste regel het pad naar de centrale map.</li>
+<li>Alle gebruikers moeten in de centrale map kunnen lezen en schrijven. Het programma bewaart daar de instellingen en het logboek.</li>
+<li>Spreek af wie de pincode krijgt en waar de herstelcode wordt bewaard.</li>
+</ul>
+
+<table class="duo"><tr>
+<td class="beeld"><img src="niet-ingericht.png" width="185"/><p class="bijschrift">Nog niet ingericht</p></td>
+<td>
+<h2>Inrichten</h2>
+<p>Zolang er geen centrale instellingen zijn, toont het programma na de waarschuwing dit scherm. Starten kan dan niet.</p>
+<ol>
+<li>Klik op <b>Inrichten</b>.</li>
+<li>Kies een pincode van 6 cijfers en vul hem twee keer in.</li>
+<li>Bewaar de herstelcode. Die wordt maar één keer getoond. Bewaar hem op een veilige plek, bijvoorbeeld in een wachtwoordmanager, en niet bij de pincode. Zet het vinkje en klik op <b>Volgende</b>.</li>
+<li>Controleer de reeks, kies bij voorkeur een vaste starttoets en klik op <b>Opslaan</b>. Dit wordt versie 1.</li>
+</ol>
+</td></tr></table>
+<p class="fig"><img src="inrichten-pincode.png" width="165"/>      <img src="inrichten-herstelcode.png" width="165"/></p>
+<p class="bijschrift">Stap 1: pincode kiezen. Stap 2: herstelcode bewaren.</p>
+<!--pagina-->
+<h2>Bestanden</h2>
+<table>
+<tr><th>Bestand</th><th>Inhoud</th></tr>
+<tr><td><span class="k">instellingen.json</span></td><td>De centrale instellingen, verzegeld met een controlecode.</td></tr>
+<tr><td><span class="k">instellingen.reserve.json</span></td><td>Kopie van de laatst opgeslagen versie, voor Reservekopie terugzetten.</td></tr>
+<tr><td><span class="k">wijzigingen.log</span></td><td>Eén regel per wijziging van de instellingen.</td></tr>
+<tr><td><span class="k">logboek\pc\datum.jsonl</span></td><td>Het logboek, per pc één bestand per dag.</td></tr>
+<tr><td><span class="k">%APPDATA%\Krab</span></td><td>Per gebruiker: de gekozen modus, en het tijdelijke logboek als de centrale map weg is.</td></tr>
+<tr><td><span class="k">%LOCALAPPDATA%\Krab</span></td><td>Kopie van deze handleiding.</td></tr>
+</table>
+<div class="let">Pas deze bestanden nooit met de hand aan. Het programma merkt dat en blokkeert het starten.</div>
+
+<h2>Wat de pincode wel en niet beschermt</h2>
+<ul>
+<li>De pincode is een drempel tegen per ongeluk of eigenhandig wijzigen, geen echte beveiliging.</li>
+<li>De centrale map is schrijfbaar voor alle gebruikers. Iemand kan de bestanden dus buiten het programma om verwijderen of overschrijven. Het programma merkt dat en blokkeert, maar kan het niet voorkomen.</li>
+<li>Wie het instellingenbestand kopieert en technisch onderlegd is, kan een pincode van 6 cijfers achterhalen. De sleutel van de controlecode staat in de openbare broncode.</li>
+</ul>
+
+<h2>Een nieuwe versie van het programma</h2>
+<p>Vervang de exe. De instellingen en het logboek blijven bewaard. De handleiding zit in de exe en wordt dus vanzelf bijgewerkt.</p>
+</section>
