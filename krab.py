@@ -3,8 +3,9 @@
 # Geleverd zoals het is, zonder enige garantie. Zie LICENSE en README.md.
 """Krab v3
 
-Stuurt per toetsaanslag een reeks sneltoetsen naar het actieve venster
-(stap 1 en 2, en in modus 'Alle stappen' ook stap 3).
+Stuurt per toetsaanslag een reeks sneltoetsen naar het actieve venster: de
+reeks van de optie die de gebruiker heeft gekozen. Opties (maximaal 10, elk
+met 1 tot 10 stappen) worden centraal ingesteld met de beheerpincode.
 
 Opzet
 - Centrale instellingen: instellingen.json in de centrale map (naast de exe,
@@ -44,26 +45,28 @@ import keyboard
 import pydirectinput as pyd
 
 APP_NAAM = "Krab"
-VERSIE = "3beta"
+VERSIE = "3.1beta"
 
-# (sleutel, weergavenaam, alleen in modus 'Alle stappen')
-STAPPEN = (
-    ("stap1", "Stap 1", False),
-    ("stap2", "Stap 2", False),
-    ("stap3", "Stap 3", True),
-)
+MAX_OPTIES = 10
+MAX_STAPPEN = 10
+MAX_NAAM = 30
+
+
+def _stap(toetsen, wacht):
+    return {"toetsen": toetsen, "wacht": wacht}
+
 
 STANDAARD_REEKS = {
     "trigger": "",  # "" = elke toets
-    "stappen": {
-        "stap1": {"toetsen": "ctrl+alt+1", "wacht": 1.8},
-        "stap2": {"toetsen": "ctrl+alt+2", "wacht": 0.5},
-        "stap3": {"toetsen": "ctrl+alt+3", "wacht": 1.0},
-    },
+    "opties": [
+        {"id": "o1", "naam": "Optie 1",
+         "stappen": [_stap("ctrl+alt+1", 1.8), _stap("ctrl+alt+2", 0.5), _stap("ctrl+alt+3", 1.0)]},
+        {"id": "o2", "naam": "Optie 2",
+         "stappen": [_stap("ctrl+alt+1", 1.8), _stap("ctrl+alt+2", 0.5)]},
+    ],
     "logboek": {"bewaardagen": 90},
 }
 
-MODUS_TEKST = {"alle": "Alle stappen", "zonder3": "Zonder stap 3"}
 MODIFIERS = {"ctrl", "alt", "shift", "win"}
 GERESERVEERD = {"esc": "Esc is gereserveerd voor stoppen.", "f1": "F1 is gereserveerd voor Help."}
 MIN_WACHT, MAX_WACHT = 0.1, 10.0
@@ -255,37 +258,77 @@ def parse_bewaardagen(waarde):
     return getal
 
 
-def valideer_reeks(data):
-    """Controleert starttoets, stappen en bewaartermijn.
+def migreer_formaat1(data):
+    """Zet instellingen van versie 3beta (vaste stap 1 t/m 3) om naar opties.
 
-    Geeft (genormaliseerd, fouten); fouten is een dict veld -> melding.
+    Optie 1 krijgt stap 1, 2 en 3 (was: modus 'Alle stappen'),
+    Optie 2 krijgt stap 1 en 2 (was: modus 'Zonder stap 3').
+    """
+    if isinstance(data.get("opties"), list) or not isinstance(data.get("stappen"), dict):
+        return data
+    oud = data["stappen"]
+    stappen = [copy.deepcopy(oud.get(s, {})) for s in ("stap1", "stap2", "stap3")]
+    nieuw = {k: v for k, v in data.items() if k != "stappen"}
+    nieuw["opties"] = [
+        {"id": "o1", "naam": "Optie 1", "stappen": stappen},
+        {"id": "o2", "naam": "Optie 2", "stappen": copy.deepcopy(stappen[:2])},
+    ]
+    return nieuw
+
+
+def valideer_reeks(data):
+    """Controleert starttoets, opties met hun stappen, en bewaartermijn.
+
+    Geeft (genormaliseerd, fouten). Sleutels in fouten: 'trigger', 'opties',
+    'bewaardagen', '<optie>.naam', '<optie>.stappen', '<optie>.<stap>.toetsen'
+    en '<optie>.<stap>.wacht' (optie en stap tellen vanaf 0).
     """
     fouten = {}
-    uit = {"trigger": "", "stappen": {}, "logboek": {}}
+    uit = {"trigger": "", "opties": [], "logboek": {}}
     trigger = data.get("trigger", "")
     if trigger:
         try:
             uit["trigger"] = parse_trigger(trigger)
         except ValueError as e:
             fouten["trigger"] = str(e)
-    stappen = data.get("stappen") if isinstance(data.get("stappen"), dict) else {}
-    for sleutel, _, _ in STAPPEN:
-        stap = stappen.get(sleutel) if isinstance(stappen.get(sleutel), dict) else {}
-        nieuw = {}
-        try:
-            nieuw["toetsen"] = "+".join(parse_combinatie(stap.get("toetsen", "")))
-        except ValueError as e:
-            fouten[f"{sleutel}.toetsen"] = str(e)
-        try:
-            nieuw["wacht"] = parse_wacht(stap.get("wacht", ""))
-        except ValueError as e:
-            fouten[f"{sleutel}.wacht"] = str(e)
-        uit["stappen"][sleutel] = nieuw
-    combinaties = [uit["stappen"][s].get("toetsen") for s, _, _ in STAPPEN]
-    for sleutel, _, _ in STAPPEN:
-        eigen = uit["stappen"][sleutel].get("toetsen")
-        if eigen and combinaties.count(eigen) > 1:
-            fouten[f"{sleutel}.toetsen"] = "Deze combinatie wordt al bij een andere stap gebruikt."
+    opties = data.get("opties") if isinstance(data.get("opties"), list) else []
+    if not opties:
+        fouten["opties"] = "Maak minstens één optie."
+    elif len(opties) > MAX_OPTIES:
+        fouten["opties"] = f"Er kunnen maximaal {MAX_OPTIES} opties zijn."
+    namen = []
+    for i, optie in enumerate(opties):
+        optie = optie if isinstance(optie, dict) else {}
+        naam = str(optie.get("naam", "")).strip()
+        nieuw = {"id": str(optie.get("id") or f"o{i + 1}"), "naam": naam, "stappen": []}
+        if not naam:
+            fouten[f"{i}.naam"] = "Geef de optie een naam."
+        elif len(naam) > MAX_NAAM:
+            fouten[f"{i}.naam"] = f"Gebruik maximaal {MAX_NAAM} tekens."
+        elif naam.lower() in namen:
+            fouten[f"{i}.naam"] = "Deze naam wordt al door een andere optie gebruikt."
+        namen.append(naam.lower())
+        stappen = optie.get("stappen") if isinstance(optie.get("stappen"), list) else []
+        if not stappen:
+            fouten[f"{i}.stappen"] = "Geef de optie minstens één stap."
+        elif len(stappen) > MAX_STAPPEN:
+            fouten[f"{i}.stappen"] = f"Een optie kan maximaal {MAX_STAPPEN} stappen hebben."
+        for j, stap in enumerate(stappen):
+            stap = stap if isinstance(stap, dict) else {}
+            s = {}
+            try:
+                s["toetsen"] = "+".join(parse_combinatie(stap.get("toetsen", "")))
+            except ValueError as e:
+                fouten[f"{i}.{j}.toetsen"] = str(e)
+            try:
+                s["wacht"] = parse_wacht(stap.get("wacht", ""))
+            except ValueError as e:
+                fouten[f"{i}.{j}.wacht"] = str(e)
+            nieuw["stappen"].append(s)
+        uit["opties"].append(nieuw)
+    ids = [o["id"] for o in uit["opties"]]
+    if len(set(ids)) != len(ids):
+        fouten["opties"] = "Twee opties hebben dezelfde interne code. Verwijder er één en maak hem opnieuw."
     logboek = data.get("logboek") if isinstance(data.get("logboek"), dict) else {}
     try:
         uit["logboek"]["bewaardagen"] = parse_bewaardagen(logboek.get("bewaardagen", ""))
@@ -294,11 +337,20 @@ def valideer_reeks(data):
     return uit, fouten
 
 
-def maak_plan(reeks, modus):
+def kies_optie(reeks, optie_id):
+    """De optie met deze id, of de eerste optie als die niet (meer) bestaat."""
+    for optie in reeks["opties"]:
+        if optie["id"] == optie_id:
+            return optie
+    return reeks["opties"][0]
+
+
+def maak_plan(reeks, optie_id):
+    optie = kies_optie(reeks, optie_id)
     return {
         "trigger": reeks["trigger"],
-        "stappen": [(naam, reeks["stappen"][s]["toetsen"].split("+"), reeks["stappen"][s]["wacht"])
-                    for s, naam, alleen_stap3 in STAPPEN if not alleen_stap3 or modus == "alle"],
+        "optie": optie["naam"],
+        "stappen": [(f"Stap {j}", s["toetsen"].split("+"), s["wacht"]) for j, s in enumerate(optie["stappen"], 1)],
     }
 
 
@@ -307,16 +359,45 @@ def verschillen(oud, nieuw):
     def trig(t):
         return f"toets {t.upper()}" if t else "elke toets"
 
+    def stap_tekst(s):
+        return f"{s['toetsen']}, {formatteer_getal(s['wacht'])} s"
+
     uit = []
     if oud["trigger"] != nieuw["trigger"]:
         uit.append(("Starttoets", trig(oud["trigger"]), trig(nieuw["trigger"])))
-    for s, naam, _ in STAPPEN:
-        a, b = oud["stappen"][s], nieuw["stappen"][s]
-        if a["toetsen"] != b["toetsen"]:
-            uit.append((naam, a["toetsen"], b["toetsen"]))
-        if a["wacht"] != b["wacht"]:
-            uit.append((f"Wacht vóór {naam}", f"{formatteer_getal(a['wacht'])} s",
-                        f"{formatteer_getal(b['wacht'])} s"))
+    oud_per_id = {o["id"]: o for o in oud["opties"]}
+    nieuw_per_id = {o["id"]: o for o in nieuw["opties"]}
+    for o in oud["opties"]:
+        if o["id"] not in nieuw_per_id:
+            uit.append(("Optie verwijderd", o["naam"], "–"))
+    for o in nieuw["opties"]:
+        a = oud_per_id.get(o["id"])
+        if a is None:
+            n = len(o["stappen"])
+            uit.append(("Optie toegevoegd", "–", f"{o['naam']} ({n} {'stap' if n == 1 else 'stappen'})"))
+            continue
+        if a["naam"] != o["naam"]:
+            uit.append(("Naam van optie", a["naam"], o["naam"]))
+        for j in range(max(len(a["stappen"]), len(o["stappen"]))):
+            sa = a["stappen"][j] if j < len(a["stappen"]) else None
+            sb = o["stappen"][j] if j < len(o["stappen"]) else None
+            label = f"{o['naam']}, stap {j + 1}"
+            if sa is None:
+                uit.append((label, "–", stap_tekst(sb)))
+            elif sb is None:
+                uit.append((label, stap_tekst(sa), "verwijderd"))
+            else:
+                if sa["toetsen"] != sb["toetsen"]:
+                    uit.append((label, sa["toetsen"], sb["toetsen"]))
+                if sa["wacht"] != sb["wacht"]:
+                    uit.append((f"{o['naam']}, wacht vóór stap {j + 1}", f"{formatteer_getal(sa['wacht'])} s",
+                                f"{formatteer_getal(sb['wacht'])} s"))
+    volgorde_oud = [o["naam"] for o in oud["opties"] if o["id"] in nieuw_per_id]
+    volgorde_nieuw = [o["naam"] for o in nieuw["opties"] if o["id"] in oud_per_id]
+    ids_oud = [o["id"] for o in oud["opties"] if o["id"] in nieuw_per_id]
+    ids_nieuw = [o["id"] for o in nieuw["opties"] if o["id"] in oud_per_id]
+    if ids_oud != ids_nieuw:
+        uit.append(("Volgorde van opties", ", ".join(volgorde_oud), ", ".join(volgorde_nieuw)))
     a, b = oud["logboek"]["bewaardagen"], nieuw["logboek"]["bewaardagen"]
     if a != b:
         uit.append(("Bewaartermijn logboek", f"{a} dagen", f"{b} dagen"))
@@ -407,6 +488,7 @@ class CentraleOpslag:
             return "onleesbaar", None, "het bestand bevat geen instellingen"
         if not zegel_klopt(data):
             return "gewijzigd", None, ""
+        data = migreer_formaat1(data)
         _, fouten = valideer_reeks(data)
         if fouten or not isinstance(data.get("versie"), int) or "pincode" not in data:
             return "onleesbaar", None, "de inhoud klopt niet"
@@ -447,7 +529,7 @@ class CentraleOpslag:
                 raise Conflict(huidig)
         nieuw = copy.deepcopy(data)
         nieuw.pop("controlecode", None)
-        nieuw["formaat"] = 1
+        nieuw["formaat"] = 2
         nieuw["versie"] = (basis_versie or 0) + 1
         nieuw["gewijzigd"] = {"op": nu().isoformat(), "pc": PC_NAAM, "reden": reden}
         nieuw["controlecode"] = zegel(nieuw)
@@ -680,14 +762,17 @@ def open_handleiding(pagina):
 # ================================================================ overig
 
 def laad_lokaal():
+    """De laatst gekozen optie op deze pc. Zet de modus van versie 3beta om."""
     try:
         with open(os.path.join(LOKALE_MAP, "lokaal.json"), encoding="utf-8") as f:
             data = json.load(f)
-        if data.get("modus") in MODUS_TEKST:
-            return data
-    except (OSError, ValueError, AttributeError):
-        pass
-    return {"modus": "alle"}
+    except (OSError, ValueError):
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    optie = data.get("optie")
+    if not isinstance(optie, str):
+        optie = {"alle": "o1", "zonder3": "o2"}.get(data.get("modus"), "o1")
+    return {"optie": optie}
 
 
 def bewaar_lokaal(data):
@@ -716,10 +801,30 @@ def concept_uit(data):
     return {
         "trigger_modus": "vast" if trigger else "elke",
         "trigger": trigger or "f9",
-        "stappen": {s: {"toetsen": data["stappen"][s]["toetsen"],
-                        "wacht": formatteer_getal(float(data["stappen"][s]["wacht"]))} for s, _, _ in STAPPEN},
+        "opties": [{"id": o["id"], "naam": o["naam"],
+                    "stappen": [{"toetsen": s["toetsen"], "wacht": formatteer_getal(float(s["wacht"]))}
+                                for s in o["stappen"]]}
+                   for o in data["opties"]],
         "bewaardagen": str(data.get("logboek", {}).get("bewaardagen", STANDAARD_REEKS["logboek"]["bewaardagen"])),
     }
+
+
+def nieuw_optie_id(opties):
+    bestaand = {o["id"] for o in opties}
+    while True:
+        kandidaat = "o" + secrets.token_hex(3)
+        if kandidaat not in bestaand:
+            return kandidaat
+
+
+def unieke_naam(opties, gewenst):
+    namen = {o["naam"].strip().lower() for o in opties}
+    if gewenst.lower() not in namen:
+        return gewenst
+    n = 2
+    while f"{gewenst} {n}".lower() in namen:
+        n += 1
+    return f"{gewenst} {n}"
 
 
 def maak_banner(parent, soort, titel=None, tekst=None, knoppen=(), link=None, breedte=380):
@@ -839,6 +944,7 @@ class App:
         s.configure("Vlak.TLabel", background=VLAK)
         s.configure("VlakKlein.TLabel", background=VLAK, font=("Segoe UI", 9), foreground=GRIJS)
         s.configure("VlakMono.TLabel", background=VLAK, font=("Consolas", 10))
+        s.configure("VlakVet.TLabel", background=VLAK, font=("Segoe UI Semibold", 10))
         s.configure("VlakUit.TLabel", background=VLAK, foreground="#A3ACB8")
         s.configure("Fout.TLabel", foreground=ROOD, font=("Segoe UI", 9))
         s.configure("Code.TLabel", font=("Consolas", 18, "bold"), background=VLAK, padding=(14, 10))
@@ -974,16 +1080,10 @@ class App:
 
         self.banner_vak = None  # wordt in _werk_hoofd_bij steeds opnieuw gemaakt
 
-        ttk.Label(f, text="MODUS", style="Kop.TLabel").pack(anchor="w", pady=(12, 4))
-        self.modus_var = tk.StringVar(value=self.lokaal["modus"])
-        self.modus_knoppen = [
-            ttk.Radiobutton(f, text="Alle stappen  –  stap 1, 2 en 3",
-                            variable=self.modus_var, value="alle", command=self._modus_gewijzigd),
-            ttk.Radiobutton(f, text="Zonder stap 3  –  stap 1 en 2",
-                            variable=self.modus_var, value="zonder3", command=self._modus_gewijzigd),
-        ]
-        for k in self.modus_knoppen:
-            k.pack(anchor="w", pady=1)
+        ttk.Label(f, text="OPTIE", style="Kop.TLabel").pack(anchor="w", pady=(12, 4))
+        self.optie_var = tk.StringVar(value=self.lokaal["optie"])
+        self.opties_vak = ttk.Frame(f)
+        self.opties_vak.pack(fill="x")
 
         rij = ttk.Frame(f)
         rij.pack(fill="x", pady=(14, 4))
@@ -1106,42 +1206,53 @@ class App:
         self.stop_knop.configure(state="normal" if actief else "disabled")
         self.instellingen_knop.configure(state="normal" if st == "ok" and not actief else "disabled")
         self.logboek_knop.configure(state="disabled" if actief else "normal")
-        for k in self.modus_knoppen:
-            k.configure(state="disabled" if actief else "normal")
 
-    def _vul_reeks_vlak(self, vlak, stappen, modus=None):
+    def _vul_reeks_vlak(self, vlak, stappen):
         for w in vlak.winfo_children():
             w.destroy()
-        for i, (sleutel, naam, alleen_stap3) in enumerate(STAPPEN):
-            stap = stappen[sleutel]
-            uit = alleen_stap3 and modus == "zonder3"
-            stijl = "VlakUit.TLabel" if uit else "Vlak.TLabel"
-            achter = " (niet in deze modus)" if uit else (" *" if alleen_stap3 and modus is None else "")
-            ttk.Label(vlak, text=f"{i + 1}", style=stijl, width=2).grid(row=i, column=0, sticky="w")
-            ttk.Label(vlak, text=naam + achter, style=stijl).grid(row=i, column=1, sticky="w", padx=(0, 10))
-            ttk.Label(vlak, text=stap["toetsen"], style="VlakUit.TLabel" if uit else "VlakMono.TLabel").grid(
-                row=i, column=2, sticky="w")
+        for j, stap in enumerate(stappen):
+            ttk.Label(vlak, text=f"{j + 1}", style="Vlak.TLabel", width=2).grid(row=j, column=0, sticky="w")
+            ttk.Label(vlak, text=f"Stap {j + 1}", style="Vlak.TLabel").grid(row=j, column=1, sticky="w", padx=(0, 10))
+            ttk.Label(vlak, text=stap["toetsen"], style="VlakMono.TLabel").grid(row=j, column=2, sticky="w")
             ttk.Label(vlak, text=f"na {formatteer_getal(float(stap['wacht']))} s",
-                      style="VlakUit.TLabel" if uit else "VlakKlein.TLabel").grid(row=i, column=3, sticky="e",
-                                                                                 padx=(10, 0))
+                      style="VlakKlein.TLabel").grid(row=j, column=3, sticky="e", padx=(10, 0))
         vlak.columnconfigure(1, weight=1)
 
     def _ververs_reeks(self):
+        """Bouwt de keuzelijst met opties en toont de reeks van de gekozen optie."""
+        for w in self.opties_vak.winfo_children():
+            w.destroy()
         if self.centraal_status == "ok":
-            self._vul_reeks_vlak(self.reeks_vlak, self.centraal["stappen"], self.modus_var.get())
+            opties = self.centraal["opties"]
+            if self.optie_var.get() not in {o["id"] for o in opties}:
+                self.optie_var.set(opties[0]["id"])
+            actief = self._actief.is_set()
+            for o in opties:
+                n = len(o["stappen"])
+                ttk.Radiobutton(self.opties_vak, text=f"{o['naam']}  –  {n} {'stap' if n == 1 else 'stappen'}",
+                                variable=self.optie_var, value=o["id"], command=self._optie_gewijzigd,
+                                state="disabled" if actief else "normal").pack(anchor="w", pady=1)
             trig = self.centraal["trigger"]
             self.trigger_label.configure(text=f"Start met: toets {trig.upper()}" if trig else "Start met: elke toets")
+        else:
+            ttk.Label(self.opties_vak, text="Geen opties beschikbaar.", style="Klein.TLabel").pack(anchor="w")
+            self.trigger_label.configure(text="")
+        self._toon_gekozen_reeks()
+
+    def _toon_gekozen_reeks(self):
+        if self.centraal_status == "ok":
+            optie = kies_optie(self.centraal, self.optie_var.get())
+            self._vul_reeks_vlak(self.reeks_vlak, optie["stappen"])
         else:
             for w in self.reeks_vlak.winfo_children():
                 w.destroy()
             tekst = "Nog geen reeks ingesteld." if self.centraal_status == "niet_ingericht" else "Reeks niet beschikbaar."
             ttk.Label(self.reeks_vlak, text=tekst, style="VlakKlein.TLabel").grid(row=0, column=0, sticky="w")
-            self.trigger_label.configure(text="")
 
-    def _modus_gewijzigd(self):
-        self.lokaal["modus"] = self.modus_var.get()
+    def _optie_gewijzigd(self):
+        self.lokaal["optie"] = self.optie_var.get()
         bewaar_lokaal(self.lokaal)
-        self._ververs_reeks()
+        self._toon_gekozen_reeks()
 
     # ------------------------------------------------------------ starten en stoppen
 
@@ -1160,8 +1271,8 @@ class App:
             self.melding_label.configure(text="Niet gestart: " + next(iter(fouten.values())))
             return
         self.melding_label.configure(text="")
-        modus = self.modus_var.get()
-        self._plan = maak_plan(reeks, modus)
+        optie = kies_optie(reeks, self.optie_var.get())
+        self._plan = maak_plan(reeks, optie["id"])
         while True:
             try:
                 self._triggers.get_nowait()
@@ -1176,9 +1287,9 @@ class App:
         self._werk_hoofd_bij()
         trig = reeks["trigger"].upper() if reeks["trigger"] else "een toets"
         self._zet_status(f"Actief – klik in het doelvenster en druk op {trig}", GROEN)
-        self.logboek.schrijf("START", f"{MODUS_TEKST[modus]} · starttoets {reeks['trigger'].upper() or 'elke toets'} · "
+        self.logboek.schrijf("START", f"{optie['naam']} · starttoets {reeks['trigger'].upper() or 'elke toets'} · "
                                       f"instellingen versie {self.centraal['versie']}",
-                             modus=modus, trigger=reeks["trigger"], instellingen=self.centraal["versie"])
+                             optie=optie["naam"], trigger=reeks["trigger"], instellingen=self.centraal["versie"])
 
     def _stop_nu(self, reden):
         """Mag vanuit elke thread worden aangeroepen; raakt Tk niet aan."""
@@ -1327,11 +1438,17 @@ class App:
             maak_banner(f, *melding).pack(fill="x", pady=(8, 0))
         ttk.Label(f, text="START DE REEKS MET", style="Kop.TLabel").pack(anchor="w", pady=(12, 2))
         ttk.Label(f, text=f"Alleen toets {d['trigger'].upper()}" if d["trigger"] else "Elke toets").pack(anchor="w")
-        ttk.Label(f, text="STAPPEN", style="Kop.TLabel").pack(anchor="w", pady=(12, 4))
+        ttk.Label(f, text="OPTIES", style="Kop.TLabel").pack(anchor="w", pady=(12, 4))
         vlak = ttk.Frame(f, style="Vlak.TFrame", padding=(10, 8))
         vlak.pack(fill="x")
-        self._vul_reeks_vlak(vlak, d["stappen"])
-        ttk.Label(f, text="* alleen in modus 'Alle stappen'", style="Klein.TLabel").pack(anchor="w", pady=(4, 0))
+        for i, o in enumerate(d["opties"]):
+            ttk.Label(vlak, text=o["naam"], style="VlakVet.TLabel").grid(row=i * 2, column=0, sticky="w",
+                                                                       pady=(0 if i == 0 else 6, 0))
+            reeks = "  →  ".join(f"{s['toetsen']} ({formatteer_getal(float(s['wacht']))} s)" for s in o["stappen"])
+            ttk.Label(vlak, text=reeks, style="VlakMono.TLabel", wraplength=400, justify="left").grid(
+                row=i * 2 + 1, column=0, sticky="w")
+        ttk.Label(f, text="Tussen haakjes: de wachttijd vóór die stap.", style="Klein.TLabel").pack(anchor="w",
+                                                                                                  pady=(4, 0))
         ttk.Label(f, text="LOGBOEK", style="Kop.TLabel").pack(anchor="w", pady=(12, 2))
         ttk.Label(f, text=f"Bewaren: {d['logboek']['bewaardagen']} dagen").pack(anchor="w")
         tk.Frame(f, height=1, background=LIJN).pack(fill="x", pady=12)
@@ -1460,34 +1577,37 @@ class App:
     def _toon_bewerken(self, banner=None):
         b = self._bewerk
         c = b["concept"]
+        b["keuze"] = min(b.get("keuze", 0), len(c["opties"]) - 1)
+        b.setdefault("fouten", {})
         inrichten = b["modus"] == "inrichten"
         f = self._scherm("Instellingen")
         if inrichten:
             maak_banner(f, "info", "Inrichten · stap 3 van 3",
-                        "Controleer de reeks. Opslaan maakt versie 1 voor alle gebruikers.").pack(fill="x", pady=(10, 0))
+                        "Controleer de opties. Opslaan maakt versie 1 voor alle gebruikers.",
+                        breedte=560).pack(fill="x", pady=(10, 0))
             self._aftel_label = None
         else:
-            bn = maak_banner(f, "info", "Ontgrendeld", "Wijzigingen gelden voor alle gebruikers.")
+            bn = maak_banner(f, "info", "Ontgrendeld", "Wijzigingen gelden voor alle gebruikers.", breedte=560)
             bn.pack(fill="x", pady=(10, 0))
             self._aftel_label = bn.tekst_label
         if banner:
-            maak_banner(f, *banner).pack(fill="x", pady=(8, 0))
+            maak_banner(f, *banner, breedte=560).pack(fill="x", pady=(8, 0))
 
         nb = ttk.Notebook(f)
         nb.pack(fill="x", pady=(12, 0))
-        tab_reeks = ttk.Frame(nb, padding=(12, 10))
+        tab_opties = ttk.Frame(nb, padding=(12, 10))
         tab_log = ttk.Frame(nb, padding=(12, 10))
-        nb.add(tab_reeks, text="Reeks")
+        nb.add(tab_opties, text="Opties")
         nb.add(tab_log, text="Logboek")
-        v = {"notebook": nb, "tabs": (tab_reeks, tab_log)}
+        v = {"notebook": nb, "tabs": (tab_opties, tab_log), "stap_rijen": []}
 
-        # -- tab Reeks
-        ttk.Label(tab_reeks, text="START DE REEKS MET", style="Kop.TLabel").pack(anchor="w")
+        # -- starttoets
+        ttk.Label(tab_opties, text="START DE REEKS MET", style="Kop.TLabel").pack(anchor="w")
         v["trigger_modus"] = tk.StringVar(value=c["trigger_modus"])
-        ttk.Radiobutton(tab_reeks, text="Elke toets", variable=v["trigger_modus"], value="elke",
-                        command=self._trigger_modus_gewijzigd).pack(anchor="w")
-        rij = ttk.Frame(tab_reeks)
+        rij = ttk.Frame(tab_opties)
         rij.pack(anchor="w", fill="x", pady=(2, 0))
+        ttk.Radiobutton(rij, text="Elke toets", variable=v["trigger_modus"], value="elke",
+                        command=self._trigger_modus_gewijzigd).pack(side="left", padx=(0, 16))
         ttk.Radiobutton(rij, text="Alleen deze toets:", variable=v["trigger_modus"], value="vast",
                         command=self._trigger_modus_gewijzigd).pack(side="left")
         v["trigger"] = ttk.Entry(rij, width=8)
@@ -1495,40 +1615,66 @@ class App:
         v["trigger"].pack(side="left", padx=(6, 4))
         v["trigger_opname"] = ttk.Button(rij, text="Opnemen", command=lambda: self._neem_op("trigger"))
         v["trigger_opname"].pack(side="left")
-        v["trigger_fout"] = ttk.Label(tab_reeks, style="Fout.TLabel", wraplength=380, justify="left")
+        v["trigger_fout"] = ttk.Label(tab_opties, style="Fout.TLabel", wraplength=560, justify="left")
         v["trigger_fout"].pack(anchor="w")
-        ttk.Label(tab_reeks, text="Aanbevolen: een vaste toets zoals F9. Met 'elke toets' start typen in "
-                                  "welk programma dan ook een reeks.",
-                  style="Klein.TLabel", wraplength=380, justify="left").pack(anchor="w")
+        ttk.Label(tab_opties, text="Aanbevolen: een vaste toets zoals F9. Met 'elke toets' start typen in "
+                                   "welk programma dan ook een reeks.",
+                  style="Klein.TLabel", wraplength=560, justify="left").pack(anchor="w")
 
-        ttk.Label(tab_reeks, text="STAPPEN", style="Kop.TLabel").pack(anchor="w", pady=(12, 4))
-        tabel = ttk.Frame(tab_reeks)
-        tabel.pack(fill="x")
-        for kol, kop in enumerate(("Stap", "Toetscombinatie", "", "Wacht vooraf (s)")):
-            ttk.Label(tabel, text=kop, style="Klein.TLabel").grid(row=0, column=kol, sticky="w", padx=(0, 6))
-        v["stappen"] = {}
-        for i, (sleutel, naam, alleen_stap3) in enumerate(STAPPEN):
-            r = 1 + i * 2
-            ttk.Label(tabel, text=naam + (" *" if alleen_stap3 else "")).grid(row=r, column=0, sticky="w",
-                                                                              padx=(0, 8), pady=(4, 0))
-            toetsen = ttk.Entry(tabel, width=16, font=("Consolas", 10))
-            toetsen.insert(0, c["stappen"][sleutel]["toetsen"])
-            toetsen.grid(row=r, column=1, sticky="w", pady=(4, 0))
-            opname = ttk.Button(tabel, text="Opnemen", command=lambda s=sleutel: self._neem_op(s))
-            opname.grid(row=r, column=2, padx=6, pady=(4, 0))
-            wacht = ttk.Entry(tabel, width=6, justify="right")
-            wacht.insert(0, c["stappen"][sleutel]["wacht"])
-            wacht.grid(row=r, column=3, sticky="w", pady=(4, 0))
-            fout = ttk.Label(tabel, style="Fout.TLabel", wraplength=380, justify="left")
-            fout.grid(row=r + 1, column=0, columnspan=4, sticky="w")
-            v["stappen"][sleutel] = (toetsen, opname, wacht, fout)
-        ttk.Label(tab_reeks, text="* alleen in modus 'Alle stappen'. Schrijf combinaties als ctrl+alt+1. "
-                                  "Esc kan niet, die is voor stoppen.",
-                  style="Klein.TLabel", wraplength=380, justify="left").pack(anchor="w", pady=(6, 0))
-        v["opname_label"] = ttk.Label(tab_reeks, style="Kop.TLabel", foreground=BLAUW)
+        # -- opties: lijst links, gekozen optie rechts
+        ttk.Label(tab_opties, text="OPTIES", style="Kop.TLabel").pack(anchor="w", pady=(12, 4))
+        werk = ttk.Frame(tab_opties)
+        werk.pack(fill="x")
+        links = ttk.Frame(werk)
+        links.pack(side="left", anchor="n")
+        v["lijst"] = tk.Listbox(links, height=8, width=24, exportselection=False, activestyle="none",
+                                font=("Segoe UI", 10), selectbackground=BLAUW, selectforeground=WIT,
+                                highlightthickness=1, highlightbackground=LIJN, relief="flat")
+        v["lijst"].pack(fill="x")
+        v["lijst"].bind("<<ListboxSelect>>", self._optie_gekozen)
+        knoppen = ttk.Frame(links)
+        knoppen.pack(fill="x", pady=(6, 0))
+        knoppen.columnconfigure((0, 1), weight=1, uniform="k")
+        v["knop_toevoegen"] = ttk.Button(knoppen, text="Toevoegen", style="Klein.TButton",
+                                         command=self._optie_toevoegen)
+        v["knop_toevoegen"].grid(row=0, column=0, sticky="ew", padx=(0, 2), pady=(0, 3))
+        v["knop_kopie"] = ttk.Button(knoppen, text="Kopiëren", style="Klein.TButton", command=self._optie_kopieren)
+        v["knop_kopie"].grid(row=0, column=1, sticky="ew", padx=(2, 0), pady=(0, 3))
+        v["knop_weg"] = ttk.Button(knoppen, text="Verwijderen", style="Klein.TButton",
+                                   command=self._optie_verwijderen)
+        v["knop_weg"].grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 3))
+        v["knop_op"] = ttk.Button(knoppen, text="▲ Omhoog", style="Klein.TButton",
+                                  command=lambda: self._optie_verplaats(-1))
+        v["knop_op"].grid(row=2, column=0, sticky="ew", padx=(0, 2))
+        v["knop_neer"] = ttk.Button(knoppen, text="▼ Omlaag", style="Klein.TButton",
+                                    command=lambda: self._optie_verplaats(1))
+        v["knop_neer"].grid(row=2, column=1, sticky="ew", padx=(2, 0))
+
+        rechts = ttk.Frame(werk)
+        rechts.pack(side="left", fill="both", expand=True, padx=(16, 0), anchor="n")
+        naamrij = ttk.Frame(rechts)
+        naamrij.pack(fill="x")
+        ttk.Label(naamrij, text="Naam").pack(side="left")
+        v["naam"] = ttk.Entry(naamrij, width=28)
+        v["naam"].pack(side="left", padx=(8, 0))
+        v["naam"].bind("<KeyRelease>", self._naam_getypt, add="+")
+        v["naam_fout"] = ttk.Label(rechts, style="Fout.TLabel", wraplength=380, justify="left")
+        v["naam_fout"].pack(anchor="w")
+        v["stappen_vak"] = ttk.Frame(rechts)
+        v["stappen_vak"].pack(fill="x", pady=(6, 0))
+        v["stap_toevoegen"] = ttk.Button(rechts, text="+ Stap toevoegen", style="Klein.TButton",
+                                         command=self._stap_toevoegen)
+        v["stap_toevoegen"].pack(anchor="w", pady=(6, 0))
+        v["optie_fout"] = ttk.Label(rechts, style="Fout.TLabel", wraplength=380, justify="left")
+        v["optie_fout"].pack(anchor="w")
+
+        ttk.Label(tab_opties, text=f"Maximaal {MAX_OPTIES} opties met elk 1 tot {MAX_STAPPEN} stappen. Schrijf "
+                                   "combinaties als ctrl+alt+1. Esc kan niet, die is voor stoppen.",
+                  style="Klein.TLabel", wraplength=560, justify="left").pack(anchor="w", pady=(8, 0))
+        v["opname_label"] = ttk.Label(tab_opties, style="Kop.TLabel", foreground=BLAUW)
         v["opname_label"].pack(anchor="w", pady=(4, 0))
-        ttk.Button(tab_reeks, text="Standaard herstellen", command=self._herstel_standaard).pack(anchor="w",
-                                                                                             pady=(6, 0))
+        ttk.Button(tab_opties, text="Standaard herstellen", command=self._herstel_standaard).pack(anchor="w",
+                                                                                              pady=(6, 0))
 
         # -- tab Logboek
         ttk.Label(tab_log, text="BEWAARTERMIJN", style="Kop.TLabel").pack(anchor="w")
@@ -1545,9 +1691,9 @@ class App:
         ttk.Label(tab_log, text=f"Oudere regels worden één keer per dag automatisch verwijderd. "
                                 f"Toegestaan: {BEWAAR_MIN} tot {BEWAAR_MAX} dagen. Het logboek bevat geen namen "
                                 "en niets van wat er op het scherm staat.",
-                  style="Klein.TLabel", wraplength=380, justify="left").pack(anchor="w", pady=(6, 0))
+                  style="Klein.TLabel", wraplength=560, justify="left").pack(anchor="w", pady=(6, 0))
 
-        v["algemeen_fout"] = ttk.Label(f, style="Fout.TLabel", wraplength=400, justify="left")
+        v["algemeen_fout"] = ttk.Label(f, style="Fout.TLabel", wraplength=560, justify="left")
         v["algemeen_fout"].pack(anchor="w", pady=(6, 0))
         if not inrichten:
             ttk.Button(f, text="Pincode wijzigen", style="Link.TButton",
@@ -1558,19 +1704,182 @@ class App:
             self._knoppenrij(f, [("Annuleren", self._naar_hoofd, False),
                                  ("Opslaan", self._bewerken_opslaan, True)])
         self._velden = v
+        for veld in (v["trigger"], v["bewaardagen"]):
+            veld.bind("<KeyRelease>", lambda _e: self._markeer_wijzigingen(), add="+")
+        self._ververs_optielijst()
+        self._bouw_stappen()
         self._trigger_modus_gewijzigd()
-        if not inrichten:
-            for w in self._alle_invoervelden():
-                w.bind("<KeyRelease>", lambda _e: self._markeer_wijzigingen(), add="+")
-            self._markeer_wijzigingen()
         self._toon(f, "inrichten" if inrichten else "wijzigen")
 
-    def _alle_invoervelden(self):
-        v = self._velden
-        velden = [v["trigger"], v["bewaardagen"]]
-        for toetsen, _, wacht, _ in v["stappen"].values():
-            velden += [toetsen, wacht]
-        return velden
+    # -- opties en stappen in het bewerkscherm
+
+    def _bewaar_formulier(self):
+        """Zet wat op het scherm staat terug in het concept (starttoets, bewaartermijn, gekozen optie)."""
+        b, v = self._bewerk, self._velden
+        if not b or not v:
+            return
+        c = b["concept"]
+        c["trigger_modus"] = v["trigger_modus"].get()
+        c["trigger"] = v["trigger"].get().strip().lower()
+        c["bewaardagen"] = v["bewaardagen"].get().strip()
+        optie = c["opties"][b["keuze"]]
+        optie["naam"] = v["naam"].get().strip()
+        optie["stappen"] = [{"toetsen": t.get().strip().lower(), "wacht": w.get().strip()}
+                            for t, _, w, _, _ in v["stap_rijen"]]
+
+    def _ververs_optielijst(self):
+        b, v = self._bewerk, self._velden
+        opties = b["concept"]["opties"]
+        met_fout = {int(k.split(".")[0]) for k in b.get("fouten", {}) if k[:1].isdigit()}
+        lijst = v["lijst"]
+        lijst.delete(0, "end")
+        for i, o in enumerate(opties):
+            n = len(o["stappen"])
+            lijst.insert("end", ("⚠ " if i in met_fout else "") + (o["naam"] or "(zonder naam)") + f"  ({n})")
+        lijst.selection_clear(0, "end")
+        lijst.selection_set(b["keuze"])
+        lijst.see(b["keuze"])
+        n = len(opties)
+        v["knop_toevoegen"].configure(state="normal" if n < MAX_OPTIES else "disabled")
+        v["knop_kopie"].configure(state="normal" if n < MAX_OPTIES else "disabled")
+        v["knop_weg"].configure(state="normal" if n > 1 else "disabled")
+        v["knop_op"].configure(state="normal" if b["keuze"] > 0 else "disabled")
+        v["knop_neer"].configure(state="normal" if b["keuze"] < n - 1 else "disabled")
+
+    def _bouw_stappen(self):
+        """Toont naam en stappen van de gekozen optie, met eventuele fouten."""
+        b, v = self._bewerk, self._velden
+        fouten = b.get("fouten", {})
+        i = b["keuze"]
+        optie = b["concept"]["opties"][i]
+        v["naam"].delete(0, "end")
+        v["naam"].insert(0, optie["naam"])
+        v["naam"].configure(style="Fout.TEntry" if f"{i}.naam" in fouten else "TEntry")
+        v["naam_fout"].configure(text=fouten.get(f"{i}.naam", ""))
+        vak = v["stappen_vak"]
+        for w in vak.winfo_children():
+            w.destroy()
+        for kol, kop in enumerate(("Stap", "Toetscombinatie", "", "Wacht (s)", "")):
+            ttk.Label(vak, text=kop, style="Klein.TLabel").grid(row=0, column=kol, sticky="w", padx=(0, 6))
+        v["stap_rijen"] = []
+        enige = len(optie["stappen"]) == 1
+        for j, stap in enumerate(optie["stappen"]):
+            r = 1 + j * 2
+            ttk.Label(vak, text=f"{j + 1}").grid(row=r, column=0, sticky="w", padx=(0, 8), pady=(3, 0))
+            toetsen = ttk.Entry(vak, width=16, font=("Consolas", 10))
+            toetsen.insert(0, stap["toetsen"])
+            toetsen.grid(row=r, column=1, sticky="w", pady=(3, 0))
+            opname = ttk.Button(vak, text="Opnemen", style="Klein.TButton",
+                                command=lambda veld=toetsen: self._neem_op(veld))
+            opname.grid(row=r, column=2, padx=6, pady=(3, 0))
+            wacht = ttk.Entry(vak, width=5, justify="right")
+            wacht.insert(0, stap["wacht"])
+            wacht.grid(row=r, column=3, sticky="w", pady=(3, 0))
+            weg = ttk.Button(vak, text="✕", width=3, style="Klein.TButton",
+                             command=lambda jj=j: self._stap_verwijderen(jj), state="disabled" if enige else "normal")
+            weg.grid(row=r, column=4, padx=(6, 0), pady=(3, 0))
+            fout = ttk.Label(vak, style="Fout.TLabel", wraplength=380, justify="left")
+            fout.grid(row=r + 1, column=0, columnspan=5, sticky="w")
+            ft, fw = fouten.get(f"{i}.{j}.toetsen"), fouten.get(f"{i}.{j}.wacht")
+            toetsen.configure(style="Fout.TEntry" if ft else "TEntry")
+            wacht.configure(style="Fout.TEntry" if fw else "TEntry")
+            fout.configure(text="  ".join(m for m in (ft, fw) if m))
+            for veld in (toetsen, wacht):
+                veld.bind("<KeyRelease>", lambda _e: self._markeer_wijzigingen(), add="+")
+            v["stap_rijen"].append((toetsen, opname, wacht, weg, fout))
+        v["stap_toevoegen"].configure(state="normal" if len(optie["stappen"]) < MAX_STAPPEN else "disabled")
+        v["optie_fout"].configure(text=fouten.get(f"{i}.stappen", ""))
+        self._markeer_wijzigingen()
+
+    def _structuur_gewijzigd(self):
+        """Na toevoegen, verwijderen of verplaatsen kloppen eerdere foutposities niet meer."""
+        self._bewerk["fouten"] = {}
+        self._velden["algemeen_fout"].configure(text="")
+        self._ververs_optielijst()
+        self._bouw_stappen()
+
+    def _optie_gekozen(self, _e=None):
+        b, v = self._bewerk, self._velden
+        keuze = v["lijst"].curselection()
+        if not keuze or keuze[0] == b["keuze"]:
+            return
+        self._bewaar_formulier()
+        b["keuze"] = keuze[0]
+        self._ververs_optielijst()
+        self._bouw_stappen()
+
+    def _naam_getypt(self, _e=None):
+        b, v = self._bewerk, self._velden
+        b["concept"]["opties"][b["keuze"]]["naam"] = v["naam"].get().strip()
+        self._ververs_optielijst()
+        self._markeer_wijzigingen()
+
+    def _optie_toevoegen(self):
+        self._bewaar_formulier()
+        b = self._bewerk
+        opties = b["concept"]["opties"]
+        if len(opties) >= MAX_OPTIES:
+            return
+        opties.append({"id": nieuw_optie_id(opties), "naam": unieke_naam(opties, f"Optie {len(opties) + 1}"),
+                       "stappen": [{"toetsen": "ctrl+alt+1", "wacht": "1,0"}]})
+        b["keuze"] = len(opties) - 1
+        self._structuur_gewijzigd()
+        self._velden["naam"].focus_set()
+        self._velden["naam"].select_range(0, "end")
+
+    def _optie_kopieren(self):
+        self._bewaar_formulier()
+        b = self._bewerk
+        opties = b["concept"]["opties"]
+        if len(opties) >= MAX_OPTIES:
+            return
+        kopie = copy.deepcopy(opties[b["keuze"]])
+        kopie["id"] = nieuw_optie_id(opties)
+        kopie["naam"] = unieke_naam(opties, f"{kopie['naam'] or 'Optie'} (kopie)"[:MAX_NAAM])
+        opties.insert(b["keuze"] + 1, kopie)
+        b["keuze"] += 1
+        self._structuur_gewijzigd()
+
+    def _optie_verwijderen(self):
+        self._bewaar_formulier()
+        b = self._bewerk
+        opties = b["concept"]["opties"]
+        if len(opties) <= 1:
+            return
+        opties.pop(b["keuze"])
+        b["keuze"] = min(b["keuze"], len(opties) - 1)
+        self._structuur_gewijzigd()
+
+    def _optie_verplaats(self, richting):
+        self._bewaar_formulier()
+        b = self._bewerk
+        opties, i = b["concept"]["opties"], b["keuze"]
+        j = i + richting
+        if not 0 <= j < len(opties):
+            return
+        opties[i], opties[j] = opties[j], opties[i]
+        b["keuze"] = j
+        self._structuur_gewijzigd()
+
+    def _stap_toevoegen(self):
+        self._bewaar_formulier()
+        b = self._bewerk
+        stappen = b["concept"]["opties"][b["keuze"]]["stappen"]
+        if len(stappen) >= MAX_STAPPEN:
+            return
+        volgende = len(stappen) + 1
+        stappen.append({"toetsen": f"ctrl+alt+{volgende}" if volgende <= 9 else "", "wacht": "0,5"})
+        self._structuur_gewijzigd()
+        self._velden["stap_rijen"][-1][0].focus_set()
+
+    def _stap_verwijderen(self, j):
+        self._bewaar_formulier()
+        b = self._bewerk
+        stappen = b["concept"]["opties"][b["keuze"]]["stappen"]
+        if len(stappen) <= 1:
+            return
+        stappen.pop(j)
+        self._structuur_gewijzigd()
 
     def _trigger_modus_gewijzigd(self):
         v = self._velden
@@ -1582,82 +1891,78 @@ class App:
         self._markeer_wijzigingen()
 
     def _lees_concept(self):
-        v = self._velden
-        return {
-            "trigger_modus": v["trigger_modus"].get(),
-            "trigger": v["trigger"].get().strip().lower(),
-            "stappen": {s: {"toetsen": v["stappen"][s][0].get().strip().lower(),
-                            "wacht": v["stappen"][s][2].get().strip()} for s, _, _ in STAPPEN},
-            "bewaardagen": v["bewaardagen"].get().strip(),
-        }
+        self._bewaar_formulier()
+        return copy.deepcopy(self._bewerk["concept"])
 
     @staticmethod
     def _reeks_uit_concept(c):
         return {
             "trigger": c["trigger"] if c["trigger_modus"] == "vast" else "",
-            "stappen": {s: dict(c["stappen"][s]) for s, _, _ in STAPPEN},
+            "opties": copy.deepcopy(c["opties"]),
             "logboek": {"bewaardagen": c["bewaardagen"]},
         }
 
     def _markeer_wijzigingen(self):
         """Kleurt velden blauw die afwijken van de opgeslagen versie (alleen bij wijzigen)."""
         b, v = self._bewerk, self._velden
-        if not b or not v or b["modus"] != "wijzigen":
+        if not b or not v or b["modus"] != "wijzigen" or "naam" not in v:
             return
         oud = concept_uit(b["basis"])
-        nieuw = self._lees_concept()
 
         def stijl(veld, gelijk):
             if veld.cget("style") != "Fout.TEntry":
                 veld.configure(style="TEntry" if gelijk else "Gewijzigd.TEntry")
 
         trig_oud = oud["trigger"] if oud["trigger_modus"] == "vast" else ""
-        trig_nieuw = nieuw["trigger"] if nieuw["trigger_modus"] == "vast" else ""
+        trig_nieuw = v["trigger"].get().strip().lower() if v["trigger_modus"].get() == "vast" else ""
         stijl(v["trigger"], trig_oud == trig_nieuw)
-        stijl(v["bewaardagen"], oud["bewaardagen"] == nieuw["bewaardagen"])
-        for s, _, _ in STAPPEN:
-            stijl(v["stappen"][s][0], oud["stappen"][s]["toetsen"] == nieuw["stappen"][s]["toetsen"])
-            stijl(v["stappen"][s][2], oud["stappen"][s]["wacht"] == nieuw["stappen"][s]["wacht"])
+        stijl(v["bewaardagen"], oud["bewaardagen"] == v["bewaardagen"].get().strip())
+        optie = b["concept"]["opties"][b["keuze"]]
+        was = next((o for o in oud["opties"] if o["id"] == optie["id"]), None)
+        stijl(v["naam"], was is not None and was["naam"] == v["naam"].get().strip())
+        for j, (toetsen, _, wacht, _, _) in enumerate(v["stap_rijen"]):
+            s = was["stappen"][j] if was is not None and j < len(was["stappen"]) else None
+            stijl(toetsen, s is not None and s["toetsen"] == toetsen.get().strip().lower())
+            stijl(wacht, s is not None and s["wacht"] == wacht.get().strip())
 
     def _toon_veldfouten(self, fouten):
-        v = self._velden
+        b, v = self._bewerk, self._velden
+        b["fouten"] = fouten
+        met_fout = sorted({int(k.split(".")[0]) for k in fouten if k[:1].isdigit()})
         v["trigger_fout"].configure(text=fouten.get("trigger", ""))
         v["trigger"].configure(style="Fout.TEntry" if "trigger" in fouten else "TEntry")
-        for sleutel, _, _ in STAPPEN:
-            toetsen, _, wacht, fout = v["stappen"][sleutel]
-            ft, fw = fouten.get(f"{sleutel}.toetsen"), fouten.get(f"{sleutel}.wacht")
-            toetsen.configure(style="Fout.TEntry" if ft else "TEntry")
-            wacht.configure(style="Fout.TEntry" if fw else "TEntry")
-            fout.configure(text="  ".join(m for m in (ft, fw) if m))
         v["bewaardagen_fout"].configure(text=fouten.get("bewaardagen", ""))
         v["bewaardagen"].configure(style="Fout.TEntry" if "bewaardagen" in fouten else "TEntry")
-        v["algemeen_fout"].configure(text="")
+        algemeen = fouten.get("opties", "")
+        if met_fout and b["keuze"] not in met_fout:
+            b["keuze"] = met_fout[0]
+        if len(met_fout) > 1:
+            algemeen = (algemeen + " " if algemeen else "") + "Meer opties bevatten fouten; ze staan gemarkeerd met ⚠."
+        v["algemeen_fout"].configure(text=algemeen)
+        self._ververs_optielijst()
+        self._bouw_stappen()
         if fouten:
-            tab = 1 if set(fouten) == {"bewaardagen"} else 0
-            v["notebook"].select(v["tabs"][tab])
-        self._markeer_wijzigingen()
+            v["notebook"].select(v["tabs"][1 if set(fouten) == {"bewaardagen"} else 0])
 
     def _herstel_standaard(self):
-        v = self._velden
-        c = concept_uit(STANDAARD_REEKS)
-        v["trigger_modus"].set(c["trigger_modus"])
-        for veld, waarde in [(v["trigger"], c["trigger"])] + [
-                (v["stappen"][s][0], c["stappen"][s]["toetsen"]) for s, _, _ in STAPPEN] + [
-                (v["stappen"][s][2], c["stappen"][s]["wacht"]) for s, _, _ in STAPPEN]:
-            staat = str(veld.cget("state"))
-            veld.configure(state="normal")
-            veld.delete(0, "end")
-            veld.insert(0, waarde)
-            veld.configure(state=staat)
+        self._bewaar_formulier()
+        b, v = self._bewerk, self._velden
+        standaard = concept_uit(STANDAARD_REEKS)
+        b["concept"].update(trigger_modus=standaard["trigger_modus"], trigger=standaard["trigger"],
+                            opties=standaard["opties"])
+        b["keuze"] = 0
+        v["trigger_modus"].set(standaard["trigger_modus"])
+        v["trigger"].configure(state="normal")
+        v["trigger"].delete(0, "end")
+        v["trigger"].insert(0, standaard["trigger"])
         self._trigger_modus_gewijzigd()
-        self._toon_veldfouten({})
+        self._structuur_gewijzigd()
 
     def _bewerken_opslaan(self):
         if self._opname_bezig:
             return
         b = self._bewerk
         concept = self._lees_concept()
-        b["concept"] = concept
         reeks, fouten = valideer_reeks(self._reeks_uit_concept(concept))
         if concept["trigger_modus"] == "vast" and not concept["trigger"]:
             fouten["trigger"] = "Vul een toets in, of kies 'Elke toets'."
@@ -1683,7 +1988,8 @@ class App:
         vlak.pack(fill="x")
         for i, (onderwerp, oud, nieuw) in enumerate(wijzigingen):
             ttk.Label(vlak, text=onderwerp, style="Vlak.TLabel").grid(row=i, column=0, sticky="w", padx=(0, 12))
-            ttk.Label(vlak, text=f"{oud}  →  {nieuw}", style="VlakMono.TLabel").grid(row=i, column=1, sticky="w")
+            ttk.Label(vlak, text=f"{oud}  →  {nieuw}", style="VlakMono.TLabel", wraplength=360,
+                      justify="left").grid(row=i, column=1, sticky="w")
         ttk.Label(f, text="REDEN VAN WIJZIGING (VERPLICHT)", style="Kop.TLabel").pack(anchor="w", pady=(12, 4))
         reden = ttk.Entry(f, width=48)
         reden.pack(anchor="w", fill="x")
@@ -1698,7 +2004,8 @@ class App:
                 fout.configure(text="Vul een reden in. Die komt in het logboek en bij de instellingen.")
                 return
             nieuw = copy.deepcopy(b["basis"])
-            nieuw.update(trigger=reeks["trigger"], stappen=reeks["stappen"], logboek=reeks["logboek"])
+            nieuw.pop("stappen", None)  # opbouw van versie 3beta
+            nieuw.update(trigger=reeks["trigger"], opties=reeks["opties"], logboek=reeks["logboek"])
             omschrijving = "; ".join(f"{o}: {a} → {n}" for o, a, n in wijzigingen)
             try:
                 opgeslagen = self.opslag.opslaan(nieuw, b["basis"]["versie"], tekst_reden, omschrijving)
@@ -1979,17 +2286,19 @@ class App:
     # ------------------------------------------------------------ opnemen van toetsen
 
     def _neem_op(self, doel):
+        """doel: 'trigger', of het invoerveld van een stap."""
         v = self._velden
         if self._opname_bezig or self._actief.is_set() or not v:
             return
+        is_trigger = isinstance(doel, str)
         self._opname_bezig = True
         v["opname_label"].configure(
-            text="Druk nu de toets in…  (Esc = annuleren)" if doel == "trigger"
+            text="Druk nu de toets in…  (Esc = annuleren)" if is_trigger
             else "Druk nu de combinatie in en laat los…  (Esc = annuleren)")
 
         def opnemen():
             try:
-                if doel == "trigger":
+                if is_trigger:
                     while True:
                         ev = keyboard.read_event(suppress=False)
                         if ev.event_type == keyboard.KEY_DOWN:
@@ -2012,9 +2321,12 @@ class App:
         delen = [normaliseer_toets(d) for d in resultaat.split("+") if d.strip()]
         if not delen or "esc" in delen:
             return
-        veld = v["trigger"] if doel == "trigger" else v["stappen"][doel][0]
+        is_trigger = isinstance(doel, str)
+        veld = v["trigger"] if is_trigger else doel
+        if not veld.winfo_exists():
+            return
         veld.delete(0, "end")
-        veld.insert(0, delen[0] if doel == "trigger" else "+".join(delen))
+        veld.insert(0, delen[0] if is_trigger else "+".join(delen))
         self._markeer_wijzigingen()
 
     # ------------------------------------------------------------ logboek

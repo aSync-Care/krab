@@ -1,8 +1,8 @@
 # Krab
 
-Krab neemt herhalend toetswerk over. Na elke toetsaanslag stuurt het een vaste, instelbare reeks sneltoetsen naar het venster dat op dat moment actief is.
+Krab neemt herhalend toetswerk over. Na elke toetsaanslag stuurt het een instelbare reeks sneltoetsen naar het venster dat op dat moment actief is.
 
-Versie: **3beta**. Dit is een bètaversie.
+Versie: **3.1beta**. Dit is een bètaversie.
 
 > [!WARNING]
 > **Gebruik op eigen risico.** Krab kijkt niet naar wat er op het scherm staat. Het controleert niet welk venster actief is en ook niet of een sneltoets het bedoelde resultaat had. Alles wat het via sneltoetsen uitvoert, geldt als een handeling van de gebruiker. **Esc stopt altijd direct.**
@@ -25,7 +25,7 @@ Krab wordt gratis gedeeld en geleverd zoals het is, zonder garantie, onderhoud o
 
 ## Wat het doet
 
-- **Reeks per toetsaanslag** van twee of drie stappen, met instelbare toetscombinaties en wachttijden. De reeks start met één vaste toets (aanbevolen, bijvoorbeeld F9) of met elke toets.
+- **Opties:** tot 10 reeksen met een eigen naam, elk van 1 tot 10 sneltoetsen met instelbare wachttijden. Gebruikers kiezen een optie; beheer stelt ze in met de pincode. De reeks start met één vaste toets (aanbevolen, bijvoorbeeld F9) of met elke toets.
 - **Esc stopt altijd**, ook midden in een reeks.
 - **Centrale instellingen** in één bestand voor alle gebruikers. Iedereen kan ze bekijken, wijzigen kan alleen met een beheerpincode. Een herstelcode helpt bij een vergeten pincode.
 - **Verzegeld bestand.** Is het instellingenbestand buiten het programma om gewijzigd, dan kan niemand starten tot de reservekopie is teruggezet.
@@ -36,7 +36,7 @@ Alles staat in de [handleiding](handleiding/handleiding.pdf).
 
 ## Installeren
 
-1. Download `Krab-v3beta.exe` bij de [release](https://github.com/aSync-Care/krab/releases). Controleer de SHA-256-controlesom die bij de release staat.
+1. Download `Krab-v3.1beta.exe` bij de [release](https://github.com/aSync-Care/krab/releases). Controleer de SHA-256-controlesom die bij de release staat.
 2. Zet de exe in een centrale map die alle gebruikers kunnen lezen én beschrijven, bijvoorbeeld op een netwerkschijf. Staat de exe op elke pc lokaal, zet dan naast de exe een bestand `locatie.txt` met op de eerste regel het pad naar de centrale map.
 3. Start het programma en richt het in: kies een beheerpincode, bewaar de herstelcode en stel de reeks in. Zie hoofdstuk 8 van de handleiding.
 

@@ -33,7 +33,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Krab-v3beta',
+    name='Krab-v3.1beta',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

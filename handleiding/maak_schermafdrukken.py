@@ -140,18 +140,18 @@ app._werk_hoofd_bij()
 foto("hoofdscherm")
 
 _echt_plan = m.maak_plan
-m.maak_plan = lambda reeks, modus: {  # korte wachttijden, alleen voor de schermafdruk
+m.maak_plan = lambda reeks, optie_id: {  # korte wachttijden, alleen voor de schermafdruk
     "trigger": reeks["trigger"],
-    "stappen": [(n, t, 0.05) for n, t, _ in _echt_plan(reeks, modus)["stappen"]]}
+    "stappen": [(n, t, 0.05) for n, t, _ in _echt_plan(reeks, optie_id)["stappen"]]}
 app._start()
 for _ in range(14):
     app._op_toets(E("f9"))
     pomp(0.7)
 foto("hoofdscherm-actief")
-m.maak_plan = lambda reeks, modus: {
+m.maak_plan = lambda reeks, optie_id: {
     "trigger": reeks["trigger"],
-    "stappen": [(n, t, 0.6) for n, t, _ in _echt_plan(reeks, modus)["stappen"]]}
-app._plan = m.maak_plan(m.valideer_reeks(app.centraal)[0], "alle")
+    "stappen": [(n, t, 0.6) for n, t, _ in _echt_plan(reeks, optie_id)["stappen"]]}
+app._plan = m.maak_plan(m.valideer_reeks(app.centraal)[0], "o1")
 app._op_toets(E("f9"))
 pomp(0.9)
 app._op_toets(E("esc"))
@@ -166,8 +166,16 @@ klik("Ontgrendelen")
 foto("pincode")
 zet(velden()[0], "482915")
 klik("Ontgrendelen")
-zet(app._velden["stappen"]["stap1"][0], "ctrl+shift+1")
-zet(app._velden["stappen"]["stap3"][2], "1,5")
+app._optie_toevoegen()
+zet(app._velden["naam"], "Snel")
+app._naam_getypt()
+app._stap_toevoegen()
+lijst = app._velden["lijst"]
+lijst.selection_clear(0, "end")
+lijst.selection_set(0)
+app._optie_gekozen()
+zet(app._velden["stap_rijen"][0][0], "ctrl+shift+1")
+zet(app._velden["stap_rijen"][2][2], "1,5")
 app._markeer_wijzigingen()
 app._laatste_activiteit = time.monotonic() - 28
 foto("instellingen-wijzigen")
@@ -175,7 +183,7 @@ app._velden["notebook"].select(1)
 foto("instellingen-logboek")
 app._velden["notebook"].select(0)
 klik("Opslaan…")
-zet(velden()[0], "Sneltoets gewijzigd na update")
+zet(velden()[0], "Optie Snel toegevoegd, sneltoets aangepast")
 foto("bevestigen")
 klik("Opslaan voor iedereen")
 foto("opgeslagen")

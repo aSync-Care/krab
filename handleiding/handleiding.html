@@ -35,13 +35,12 @@ table.duo h2 { margin-top: 0; }
 </style>
 
 <section id="waarschuwing" data-titel="Wat het programma doet en de risico's">
-<p>Krab neemt herhalend toetswerk over. Na elke toetsaanslag stuurt het programma een vaste reeks sneltoetsen naar het venster dat op dat moment actief is:</p>
-<ol>
-<li><b>Stap 1</b>, standaard <span class="k">Ctrl+Alt+1</span></li>
-<li><b>Stap 2</b>, standaard <span class="k">Ctrl+Alt+2</span></li>
-<li><b>Stap 3</b>, standaard <span class="k">Ctrl+Alt+3</span>. Alleen in modus <i>Alle stappen</i>.</li>
-</ol>
-<p>De toetscombinaties zijn in te stellen. Vóór elke stap wacht het programma even, zodat het andere programma de vorige sneltoets kan verwerken.</p>
+<p>Krab neemt herhalend toetswerk over. Na elke toetsaanslag stuurt het programma een reeks sneltoetsen naar het venster dat op dat moment actief is. Welke reeks dat is, hangt af van de gekozen <b>optie</b>. Na installatie zijn er twee:</p>
+<ul>
+<li><b>Optie 1</b>: <span class="k">Ctrl+Alt+1</span>, <span class="k">Ctrl+Alt+2</span> en <span class="k">Ctrl+Alt+3</span></li>
+<li><b>Optie 2</b>: <span class="k">Ctrl+Alt+1</span> en <span class="k">Ctrl+Alt+2</span></li>
+</ul>
+<p>Beheer kan opties toevoegen en de toetscombinaties instellen. Vóór elke stap wacht het programma even, zodat het andere programma de vorige sneltoets kan verwerken.</p>
 
 <h2>Wat het programma niet doet</h2>
 <ul>
@@ -73,7 +72,7 @@ table.duo h2 { margin-top: 0; }
 <td>
 <h2>Zo werkt u ermee</h2>
 <ol>
-<li>Kies de modus.</li>
+<li>Kies de optie.</li>
 <li>Controleer de reeks.</li>
 <li>Klik op <b>Start</b>. De status wordt groen: <i>Actief</i>.</li>
 <li>Klik in het venster waar de sneltoetsen naartoe moeten.</li>
@@ -86,7 +85,7 @@ table.duo h2 { margin-top: 0; }
 <h2>Het hoofdscherm</h2>
 <table>
 <tr><th>Onderdeel</th><th>Betekenis</th></tr>
-<tr><td>Modus</td><td><i>Alle stappen</i> of <i>Zonder stap 3</i>. Zie hoofdstuk 3.</td></tr>
+<tr><td>Optie</td><td>Welke reeks de starttoets uitvoert. Zie hoofdstuk 3.</td></tr>
 <tr><td>Reeks per toetsaanslag</td><td>De stappen die het programma uitvoert, met de toetscombinatie en de wachttijd vóór elke stap.</td></tr>
 <tr><td>Start met</td><td>De toets waarmee u een reeks start.</td></tr>
 <tr><td>Centraal beheerd</td><td>Versie en datum van de instellingen die voor iedereen gelden.</td></tr>
@@ -113,14 +112,14 @@ table.duo h2 { margin-top: 0; }
 <p>De knop <b>Help</b>, of <span class="k">F1</span> als Krab het actieve venster is, opent deze handleiding in de browser op de pagina die bij het scherm hoort.</p>
 </section>
 
-<section id="modus" data-titel="Modus en starttoets">
-<h2>Modus</h2>
-<table>
-<tr><th>Modus</th><th>Stappen per reeks</th></tr>
-<tr><td>Alle stappen</td><td>Stap 1, 2 en 3</td></tr>
-<tr><td>Zonder stap 3</td><td>Stap 1 en 2</td></tr>
-</table>
-<p>De modus kiest u zelf. Het programma onthoudt hem op deze pc. Terwijl het programma actief is, kunt u de modus niet wijzigen.</p>
+<section id="modus" data-titel="Opties en starttoets">
+<h2>Opties</h2>
+<p>Een optie is een reeks van 1 tot 10 sneltoetsen met een eigen naam. Op het hoofdscherm kiest u welke optie de starttoets uitvoert. Daaronder staat de reeks van die optie.</p>
+<ul>
+<li>Na installatie zijn er twee opties: <i>Optie 1</i> met drie stappen en <i>Optie 2</i> met twee.</li>
+<li>Beheer kan tot 10 opties maken: toevoegen, hernoemen, kopiëren, verwijderen en in volgorde zetten (hoofdstuk 5).</li>
+<li>Welke optie u kiest, onthoudt het programma op deze pc. Terwijl het programma actief is, kunt u niet van optie wisselen. Stop dan eerst.</li>
+</ul>
 
 <h2>Starttoets</h2>
 <p>Beheer bepaalt welke toets een reeks start:</p>
@@ -146,7 +145,7 @@ table.duo h2 { margin-top: 0; }
 <table>
 <tr><th>Onderdeel</th><th>Betekenis</th></tr>
 <tr><td>Start de reeks met</td><td>Eén vaste toets, of elke toets.</td></tr>
-<tr><td>Stappen</td><td>Per stap de toetscombinatie en de wachttijd vóór die stap (<i>na 1,8 s</i>). Een * betekent: alleen in modus <i>Alle stappen</i>.</td></tr>
+<tr><td>Opties</td><td>Per optie de naam en de reeks: elke toetscombinatie, met tussen haakjes de wachttijd vóór die stap.</td></tr>
 <tr><td>Logboek</td><td>Hoeveel dagen het logboek bewaard blijft.</td></tr>
 <tr><td>Versie</td><td>Versienummer, datum, de pc waarop is opgeslagen en de reden van de laatste wijziging.</td></tr>
 </table>
@@ -172,8 +171,10 @@ table.duo h2 { margin-top: 0; }
 <h2>Aanpassen</h2>
 <ul>
 <li>De blauwe balk toont dat de instellingen ontgrendeld zijn. Na 5 minuten zonder activiteit vergrendelen ze vanzelf. Wijzigingen die dan nog niet zijn opgeslagen, vervallen.</li>
-<li><b>Tabblad Reeks:</b> de starttoets, en per stap de toetscombinatie en de wachttijd vóór die stap (0,1 tot 10 seconden). Typ een combinatie, of klik op <b>Opnemen</b> en druk de combinatie in. Esc annuleert het opnemen.</li>
-<li><b>Standaard herstellen</b> zet de oorspronkelijke combinaties en wachttijden terug.</li>
+<li><b>Tabblad Opties:</b> bovenaan de starttoets. Links de lijst met opties, met knoppen om een optie toe te voegen, te kopiëren, te verwijderen of te verplaatsen. Rechts de naam en de stappen van de gekozen optie: per stap de toetscombinatie en de wachttijd vóór die stap (0,1 tot 10 seconden).</li>
+<li>Typ een combinatie, of klik op <b>Opnemen</b> en druk de combinatie in. Esc annuleert het opnemen. Met <b>+ Stap toevoegen</b> en ✕ voegt u stappen toe of haalt u ze weg.</li>
+<li>Een optie met een fout krijgt een ⚠ in de lijst. Bij opslaan springt het scherm naar de eerste optie met een fout.</li>
+<li><b>Standaard herstellen</b> zet Optie 1 en Optie 2 met hun oorspronkelijke combinaties terug. Andere opties vervallen dan.</li>
 <li><b>Tabblad Logboek:</b> de bewaartermijn (7 tot 3650 dagen) en de knop <b>Logmap openen</b>.</li>
 <li><b>Vergrendelen</b> sluit de instellingen zonder op te slaan.</li>
 </ul>
@@ -185,7 +186,9 @@ table.duo h2 { margin-top: 0; }
 <tr><td>Toetsen met een + ertussen</td><td><span class="k">ctrl+alt+1</span></td></tr>
 <tr><td>Minstens één gewone toets naast ctrl, alt, shift of win</td><td><span class="k">ctrl+alt</span> kan niet</td></tr>
 <tr><td>Geen Esc, die is voor stoppen</td><td><span class="k">ctrl+esc</span> kan niet</td></tr>
-<tr><td>Elke stap heeft een eigen combinatie</td><td>twee keer <span class="k">ctrl+alt+1</span> kan niet</td></tr>
+<tr><td>Dezelfde toets mag vaker in één optie voorkomen</td><td>twee keer <span class="k">tab</span> kan wel</td></tr>
+<tr><td>Elke optie heeft een eigen naam van maximaal 30 tekens</td><td>twee keer <i>Optie 1</i> kan niet</td></tr>
+<tr><td>Maximaal 10 opties, elk met 1 tot 10 stappen</td><td></td></tr>
 <tr><td>Starttoets: één gewone toets, niet Esc en niet F1</td><td><span class="k">f9</span></td></tr>
 </table>
 
@@ -213,7 +216,7 @@ table.duo h2 { margin-top: 0; }
 <tr><th>Soort</th><th>Wanneer</th></tr>
 <tr><td>OPEN</td><td>Het programma is gestart.</td></tr>
 <tr><td>AKKOORD</td><td>De waarschuwing is geaccepteerd.</td></tr>
-<tr><td>START</td><td>Klik op Start, met modus, starttoets en versie van de instellingen.</td></tr>
+<tr><td>START</td><td>Klik op Start, met optie, starttoets en versie van de instellingen.</td></tr>
 <tr><td>REEKS</td><td>Een reeks is volledig verstuurd, met de combinaties en de duur.</td></tr>
 <tr><td>AFGEBROKEN</td><td>Esc of Stop midden in een reeks, met de stap waarna is gestopt. Oranje.</td></tr>
 <tr><td>STOP</td><td>Gestopt met de knop, Esc of afsluiten, met het aantal reeksen.</td></tr>
@@ -307,7 +310,7 @@ table.duo h2 { margin-top: 0; }
 <li>Klik op <b>Inrichten</b>.</li>
 <li>Kies een pincode van 6 cijfers en vul hem twee keer in.</li>
 <li>Bewaar de herstelcode. Die wordt maar één keer getoond. Bewaar hem op een veilige plek, bijvoorbeeld in een wachtwoordmanager, en niet bij de pincode. Zet het vinkje en klik op <b>Volgende</b>.</li>
-<li>Controleer de reeks, kies bij voorkeur een vaste starttoets en klik op <b>Opslaan</b>. Dit wordt versie 1.</li>
+<li>Controleer de opties, kies bij voorkeur een vaste starttoets en klik op <b>Opslaan</b>. Dit wordt versie 1.</li>
 </ol>
 </td></tr></table>
 <p class="fig"><img src="inrichten-pincode.png" width="165"/>      <img src="inrichten-herstelcode.png" width="165"/></p>
@@ -320,7 +323,7 @@ table.duo h2 { margin-top: 0; }
 <tr><td><span class="k">instellingen.reserve.json</span></td><td>Kopie van de laatst opgeslagen versie, voor Reservekopie terugzetten.</td></tr>
 <tr><td><span class="k">wijzigingen.log</span></td><td>Eén regel per wijziging van de instellingen.</td></tr>
 <tr><td><span class="k">logboek\pc\datum.jsonl</span></td><td>Het logboek, per pc één bestand per dag.</td></tr>
-<tr><td><span class="k">%APPDATA%\Krab</span></td><td>Per gebruiker: de gekozen modus, en het tijdelijke logboek als de centrale map weg is.</td></tr>
+<tr><td><span class="k">%APPDATA%\Krab</span></td><td>Per gebruiker: de gekozen optie, en het tijdelijke logboek als de centrale map weg is.</td></tr>
 <tr><td><span class="k">%LOCALAPPDATA%\Krab</span></td><td>Kopie van deze handleiding.</td></tr>
 </table>
 <div class="let">Pas deze bestanden nooit met de hand aan. Het programma merkt dat en blokkeert het starten.</div>
